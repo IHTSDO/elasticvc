@@ -36,7 +36,7 @@ public class BranchService {
 		Assert.notNull(path, "Branch path can not be null.");
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character.");
 
-		logger.debug("Creating branch {}", path);
+		logger.debug("Attempting to create branch {}", path);
 		Date commitTimepoint = new Date();
 		if (findLatest(path) != null) {
 			throw new IllegalArgumentException("Branch '" + path + "' already exists.");
@@ -55,7 +55,7 @@ public class BranchService {
 		branch.setBase(parentBranch == null ? commitTimepoint : parentBranch.getHead());
 		branch.setHead(commitTimepoint);
 		branch.setStart(commitTimepoint);
-		logger.debug("Persisting branch {}", branch);
+		logger.info("Creating branch {}", branch);
 		return doSave(branch).setState(Branch.BranchState.UP_TO_DATE);
 	}
 
