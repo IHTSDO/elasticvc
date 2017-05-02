@@ -30,7 +30,13 @@ public class BranchService {
 	@Autowired
 	private ElasticsearchOperations elasticsearchTemplate;
 
+	private final List<CommitListener> commitListeners;
+
 	final Logger logger = LoggerFactory.getLogger(getClass());
+
+	public BranchService() {
+		commitListeners = new ArrayList<>();
+	}
 
 	public Branch create(String path) {
 		Assert.notNull(path, "Branch path can not be null.");
@@ -194,6 +200,8 @@ public class BranchService {
 	}
 
 	public synchronized void completeCommit(Commit commit) {
+		commitListeners.forEach(c -> c.preCommitCompletion(commit));
+
 		final Date timepoint = commit.getTimepoint();
 		final Branch oldBranchTimespan = commit.getBranch();
 		oldBranchTimespan.setEnd(timepoint);
@@ -255,6 +263,12 @@ public class BranchService {
 			doSave(branch);
 		} else {
 			throw new IllegalArgumentException("Branch not found " + path);
+		}
+	}
+
+	public void addCommitListener(CommitListener commitListener) {
+		if (!commitListeners.contains(commitListener)) {
+			commitListeners.add(commitListener);
 		}
 	}
 
