@@ -31,7 +31,7 @@ public class ComponentService {
 		Class<C> componentClass = (Class<C>) classes[0];
 		final List<C> changedComponents = getChangedComponents(components);
 		if (!changedComponents.isEmpty()) {
-			logger.info("Saving batch of {} {}", changedComponents.size(), componentClass.getSimpleName());
+			logger.info("Saving batch of {} {}s", changedComponents.size(), componentClass.getSimpleName());
 			final List<String> ids = changedComponents.stream().map(DomainEntity::getId).collect(Collectors.toList());
 			versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
 			versionControlHelper.removeDeleted(changedComponents);
