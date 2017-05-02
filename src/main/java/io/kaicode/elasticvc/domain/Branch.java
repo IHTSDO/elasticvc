@@ -10,7 +10,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
-@Document(type = "branch", indexName = "branch")
+@Document(type = "branch", indexName = "branch", shards = 8)
 public class Branch extends Entity {
 
 	@Field(type = FieldType.Date, index = FieldIndex.not_analyzed)
