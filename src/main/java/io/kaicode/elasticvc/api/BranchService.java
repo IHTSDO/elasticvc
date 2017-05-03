@@ -119,7 +119,7 @@ public class BranchService {
 	public Branch findBranchOrThrow(String path) {
 		final Branch branch = findLatest(path);
 		if (branch == null) {
-			throw new IllegalArgumentException("Branch '" + path + "' does not exist.");
+			throw new BranchNotFoundException("Branch '" + path + "' does not exist.");
 		}
 		return branch;
 	}
