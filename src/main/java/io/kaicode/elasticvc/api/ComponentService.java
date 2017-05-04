@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +27,10 @@ public class ComponentService {
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	@SuppressWarnings("unchecked")
+	/**
+	 * Saves components within commit.
+	 * @return The saved components with updated metadata not including those which were deleted.
+	 */
 	public <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchCrudRepository<C, String> repository) {
 		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchCrudRepository.class, repository.getClass());
 		Class<C> componentClass = (Class<C>) classes[0];
@@ -35,17 +40,20 @@ public class ComponentService {
 			final List<String> ids = changedComponents.stream().map(DomainEntity::getId).collect(Collectors.toList());
 			versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
 			versionControlHelper.removeDeleted(changedComponents);
-			versionControlHelper.removeDeleted(components);
 			if (!changedComponents.isEmpty()) {
 				versionControlHelper.setEntityMeta(changedComponents, commit);
 				repository.save(changedComponents);
 			}
 		}
-		return components;
+		return components.stream().filter(c -> !c.isDeleted()).collect(Collectors.toSet());
 	}
 
 	protected <C extends DomainEntity> List<C> getChangedComponents(Collection<C> components) {
 		return components.stream().filter(component -> component.isChanged() || component.isDeleted()).collect(Collectors.toList());
+	}
+
+	public String getFetchCount(int size) {
+		return "(" + ((size / CLAUSE_LIMIT) + 1) + " fetches)";
 	}
 
 }
