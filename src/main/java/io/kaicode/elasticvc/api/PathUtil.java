@@ -14,7 +14,11 @@ public class PathUtil {
 	}
 
 	public static String flaten(String path) {
-		return path.replace("/", "_");
+		if (path != null) {
+			return path.replace("/", "_");
+		} else {
+			throw new RuntimeException("Path is null");
+		}
 	}
 
 	public static String fatten(String path) {
