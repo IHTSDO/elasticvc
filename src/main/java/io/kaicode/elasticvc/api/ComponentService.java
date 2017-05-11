@@ -2,6 +2,7 @@ package io.kaicode.elasticvc.api;
 
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
+import io.kaicode.elasticvc.domain.Entity;
 import net.jodah.typetools.TypeResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,7 +31,7 @@ public class ComponentService {
 	 * Saves components within commit.
 	 * @return The saved components with updated metadata not including those which were deleted.
 	 */
-	public <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchCrudRepository<C, String> repository) {
+	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchCrudRepository<C, String> repository) {
 		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchCrudRepository.class, repository.getClass());
 		Class<C> componentClass = (Class<C>) classes[0];
 		final List<C> changedComponents = getChangedComponents(components);
@@ -48,11 +48,11 @@ public class ComponentService {
 		return components.stream().filter(c -> !c.isDeleted()).collect(Collectors.toSet());
 	}
 
-	protected <C extends DomainEntity> List<C> getChangedComponents(Collection<C> components) {
+	private <C extends DomainEntity> List<C> getChangedComponents(Collection<C> components) {
 		return components.stream().filter(component -> component.isChanged() || component.isDeleted()).collect(Collectors.toList());
 	}
 
-	public String getFetchCount(int size) {
+	protected String getFetchCount(int size) {
 		return "(" + ((size / CLAUSE_LIMIT) + 1) + " fetches)";
 	}
 
