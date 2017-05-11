@@ -45,11 +45,15 @@ public class VersionControlHelper {
 
 	public QueryBuilder getChangesOnBranchCriteria(String path) {
 		final Branch branch = getBranchOrThrow(path);
-		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.ON_THIS_BRANCH_ONLY);
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY);
 	}
 
-	public QueryBuilder getBranchCriteriaOpenCommitChangesOnly(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.UNCOMMITTED_CHANGES_ON_THIS_BRANCH_ONLY);
+	public QueryBuilder getBranchCriteriaChangesWithinOpenCommitOnly(Commit commit) {
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.CHANGES_IN_THIS_COMMIT_ONLY);
+	}
+
+	public QueryBuilder getBranchCriteriaChangesAndDeletionsWithinOpenCommitOnly(Commit commit) {
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY);
 	}
 
 	public BoolQueryBuilder getUpdatesOnBranchDuringRangeCriteria(String path, Date start, Date end) {
@@ -73,21 +77,35 @@ public class VersionControlHelper {
 	private BoolQueryBuilder getBranchCriteria(Branch branch, Date timepoint, Set<String> versionsReplaced, ContentSelection contentSelection) {
 		final BoolQueryBuilder boolQueryShouldClause = boolQuery();
 		final BoolQueryBuilder branchCriteria =
-				boolQuery().should(boolQueryShouldClause
-						.must(termQuery("path", branch.getFlatPath()))
-						.mustNot(existsQuery("end")));
+				boolQuery().should(boolQueryShouldClause.must(termQuery("path", branch.getFlatPath())));
 
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
-					boolQueryShouldClause.must(rangeQuery("start").lte(timepoint));
-					addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
-					break;
-			case ON_THIS_BRANCH_ONLY:
-					boolQueryShouldClause.must(rangeQuery("start").lte(timepoint));
-					break;
-			case UNCOMMITTED_CHANGES_ON_THIS_BRANCH_ONLY:
-					boolQueryShouldClause.must(termQuery("start", timepoint));
-					break;
+				// On this branch and started not ended
+				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint))
+						.mustNot(existsQuery("end"));
+				// Or any parent branch within time constraints
+				addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+				break;
+
+			case CHANGES_ON_THIS_BRANCH_ONLY:
+				// On this branch and started not ended
+				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint))
+						.mustNot(existsQuery("end"));
+				break;
+
+			case CHANGES_IN_THIS_COMMIT_ONLY:
+				// On this branch and started at commit date, not ended
+				boolQueryShouldClause.must(termQuery("start", timepoint))
+						.mustNot(existsQuery("end"));
+				break;
+
+			case CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY:
+				// On this branch and started at commit date, not ended
+				boolQueryShouldClause.must(boolQuery()
+						.should(termQuery("start", timepoint))
+						.should(termQuery("end", timepoint)));
+				break;
 		}
 		return branchCriteria;
 	}
@@ -184,13 +202,10 @@ public class VersionControlHelper {
 		entity.clearInternalId();
 	}
 
-	public <C extends DomainEntity> void removeDeleted(Collection<C> entities) {
-		entities.removeAll(entities.stream().filter(Entity::isDeleted).collect(Collectors.toSet()));
-	}
-
 	enum ContentSelection {
 		STANDARD_SELECTION,
-		ON_THIS_BRANCH_ONLY,
-		UNCOMMITTED_CHANGES_ON_THIS_BRANCH_ONLY
+		CHANGES_ON_THIS_BRANCH_ONLY,
+		CHANGES_IN_THIS_COMMIT_ONLY,
+		CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY
 	}
 }
