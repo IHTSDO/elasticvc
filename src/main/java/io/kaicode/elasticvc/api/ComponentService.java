@@ -2,7 +2,6 @@ package io.kaicode.elasticvc.api;
 
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
-import io.kaicode.elasticvc.domain.Entity;
 import net.jodah.typetools.TypeResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,22 +34,20 @@ public class ComponentService {
 	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchCrudRepository<C, String> repository) {
 		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchCrudRepository.class, repository.getClass());
 		Class<C> componentClass = (Class<C>) classes[0];
-		final List<C> changedComponents = getChangedComponents(components);
-		if (!changedComponents.isEmpty()) {
-			logger.info("Saving batch of {} {}s", changedComponents.size(), componentClass.getSimpleName());
-			final List<String> ids = changedComponents.stream().map(DomainEntity::getId).collect(Collectors.toList());
+		final List<C> changedOrDeletedComponents = components.stream().filter(component -> component.isChanged() || component.isDeleted()).collect(Collectors.toList());
+		final Set<String> deletedComponentIds = changedOrDeletedComponents.stream().filter(DomainEntity::isDeleted).map(DomainEntity::getId).collect(Collectors.toSet());
+		commit.addVersionsDeleted(deletedComponentIds);
+		if (!changedOrDeletedComponents.isEmpty()) {
+			logger.info("Saving batch of {} {}s", changedOrDeletedComponents.size(), componentClass.getSimpleName());
+			final List<String> ids = changedOrDeletedComponents.stream().map(DomainEntity::getId).collect(Collectors.toList());
 			versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
-			versionControlHelper.removeDeleted(changedComponents);
+			final List<C> changedComponents = changedOrDeletedComponents.stream().filter(d -> !d.isDeleted()).collect(Collectors.toList());
 			if (!changedComponents.isEmpty()) {
 				versionControlHelper.setEntityMeta(changedComponents, commit);
 				repository.save(changedComponents);
 			}
 		}
 		return components.stream().filter(c -> !c.isDeleted()).collect(Collectors.toSet());
-	}
-
-	private <C extends DomainEntity> List<C> getChangedComponents(Collection<C> components) {
-		return components.stream().filter(component -> component.isChanged() || component.isDeleted()).collect(Collectors.toList());
 	}
 
 	protected String getFetchCount(int size) {

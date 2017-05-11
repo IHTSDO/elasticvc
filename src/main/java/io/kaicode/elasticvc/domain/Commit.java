@@ -11,6 +11,7 @@ public class Commit {
 	private Date timepoint;
 
 	private Set<String> entityVersionsReplaced;
+	private Set<String> entityVersionsDeleted;
 
 	private CommitType commitType;
 	private String sourceBranchPath;
@@ -19,6 +20,7 @@ public class Commit {
 		this.branch = branch;
 		this.timepoint = new Date();
 		entityVersionsReplaced = new HashSet<>();
+		entityVersionsDeleted = new HashSet<>();
 		this.commitType = commitType;
 	}
 
@@ -50,12 +52,24 @@ public class Commit {
 		entityVersionsReplaced.addAll(internalIds);
 	}
 
+	public void addVersionsDeleted(Set<String> internalIds) {
+		entityVersionsDeleted.addAll(internalIds);
+	}
+
 	public void addVersionReplaced(String internalId) {
 		entityVersionsReplaced.add(internalId);
 	}
 
+	public void addVersionDeleted(String internalId) {
+		entityVersionsDeleted.add(internalId);
+	}
+
 	public Set<String> getEntityVersionsReplaced() {
 		return entityVersionsReplaced;
+	}
+
+	public Set<String> getEntityVersionsDeleted() {
+		return entityVersionsDeleted;
 	}
 
 	public void setSourceBranchPath(String sourceBranchPath) {
