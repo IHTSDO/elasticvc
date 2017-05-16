@@ -2,7 +2,6 @@ package io.kaicode.elasticvc.api;
 
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
-import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.domain.Entity;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
@@ -19,6 +18,7 @@ import org.springframework.util.Assert;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static io.kaicode.elasticvc.api.VersionControlHelper.ContentSelection.CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY;
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
 public class VersionControlHelper {
@@ -36,24 +36,24 @@ public class VersionControlHelper {
 	}
 
 	public QueryBuilder getBranchCriteria(Branch branch) {
-		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION);
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
 	public QueryBuilder getBranchCriteriaIncludingOpenCommit(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.STANDARD_SELECTION);
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
 	}
 
 	public QueryBuilder getChangesOnBranchCriteria(String path) {
 		final Branch branch = getBranchOrThrow(path);
-		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY);
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY, null);
 	}
 
 	public QueryBuilder getBranchCriteriaChangesWithinOpenCommitOnly(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.CHANGES_IN_THIS_COMMIT_ONLY);
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.CHANGES_IN_THIS_COMMIT_ONLY, commit);
 	}
 
 	public QueryBuilder getBranchCriteriaChangesAndDeletionsWithinOpenCommitOnly(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY);
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY, commit);
 	}
 
 	public BoolQueryBuilder getUpdatesOnBranchDuringRangeCriteria(String path, Date start, Date end) {
@@ -74,7 +74,7 @@ public class VersionControlHelper {
 		return branch;
 	}
 
-	private BoolQueryBuilder getBranchCriteria(Branch branch, Date timepoint, Set<String> versionsReplaced, ContentSelection contentSelection) {
+	private BoolQueryBuilder getBranchCriteria(Branch branch, Date timepoint, Set<String> versionsReplaced, ContentSelection contentSelection, Commit commit) {
 		final BoolQueryBuilder boolQueryShouldClause = boolQuery();
 		final BoolQueryBuilder branchCriteria =
 				boolQuery().should(boolQueryShouldClause.must(termQuery("path", branch.getFlatPath())));
@@ -105,6 +105,37 @@ public class VersionControlHelper {
 				boolQueryShouldClause.must(boolQuery()
 						.should(termQuery("start", timepoint))
 						.should(termQuery("end", timepoint)));
+
+				if (commit != null && commit.isRebase()) {
+
+					// A rebase commit also includes all the changes
+					// between the previous and new base timepoints on all ancestor branches
+
+					// Collect previous and new base timepoints on all ancestor branches
+					List<BranchTimeRange> branchTimeRanges = new ArrayList<>();
+					Date tempBase = commit.getRebasePreviousBase();
+					String parentPath = branch.getFatPath();
+					while ((parentPath = PathUtil.getParentPath(parentPath)) != null) {
+						Branch latestVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, commit.getTimepoint());
+						branchTimeRanges.add(new BranchTimeRange(parentPath, tempBase, latestVersionOfParent.getHead()));
+
+						Branch baseVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, tempBase);
+						tempBase = baseVersionOfParent.getBase();
+					}
+
+					// Add all branch time ranges to selection criteria
+					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
+						branchCriteria.should(boolQuery()
+								.must(termQuery("path", PathUtil.flaten(branchTimeRange.getPath())))
+								.must(rangeQuery("start").gt(branchTimeRange.getStart()))
+								.must(boolQuery()
+										.should(boolQuery().mustNot(existsQuery("end")))
+										.should(rangeQuery("end").lte(branchTimeRange.getEnd()))
+								)
+						);
+					}
+				}
+
 				break;
 		}
 		return branchCriteria;
@@ -207,5 +238,30 @@ public class VersionControlHelper {
 		CHANGES_ON_THIS_BRANCH_ONLY,
 		CHANGES_IN_THIS_COMMIT_ONLY,
 		CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY
+	}
+
+	private static final class BranchTimeRange {
+
+		private String path;
+		private Date start;
+		private Date end;
+
+		public BranchTimeRange(String path, Date start, Date end) {
+			this.path = path;
+			this.start = start;
+			this.end = end;
+		}
+
+		public String getPath() {
+			return path;
+		}
+
+		public Date getStart() {
+			return start;
+		}
+
+		public Date getEnd() {
+			return end;
+		}
 	}
 }

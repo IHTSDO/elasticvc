@@ -177,6 +177,7 @@ public class BranchService {
 		if (!PathUtil.isRoot(fatPath)) {
 			final String parentPath = PathUtil.getParentPath(fatPath);
 			final Branch parentBranch = findAtTimepointOrThrow(parentPath, commit.getTimepoint());
+			commit.setRebasePreviousBase(branch.getBase());
 			branch.setBase(parentBranch.getHead());
 		}
 		return commit;

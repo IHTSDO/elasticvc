@@ -9,9 +9,11 @@ public class Commit {
 	private Branch branch;
 
 	private Date timepoint;
+	private Date rebasePreviousBase;
 
 	private Set<String> entityVersionsReplaced;
 	private Set<String> entityVersionsDeleted;
+	private Set<String> versionsDeletedOnParentFromRebase;
 
 	private CommitType commitType;
 	private String sourceBranchPath;
@@ -72,6 +74,14 @@ public class Commit {
 		return entityVersionsDeleted;
 	}
 
+	public Set<String> getVersionsDeletedOnParentFromRebase() {
+		return versionsDeletedOnParentFromRebase;
+	}
+
+	public void setVersionsDeletedOnParentFromRebase(Set<String> versionsDeletedOnParentFromRebase) {
+		this.versionsDeletedOnParentFromRebase = versionsDeletedOnParentFromRebase;
+	}
+
 	public void setSourceBranchPath(String sourceBranchPath) {
 		this.sourceBranchPath = sourceBranchPath;
 	}
@@ -82,6 +92,14 @@ public class Commit {
 
 	public boolean isRebase() {
 		return CommitType.REBASE == commitType;
+	}
+
+	public void setRebasePreviousBase(Date rebasePreviousBase) {
+		this.rebasePreviousBase = rebasePreviousBase;
+	}
+
+	public Date getRebasePreviousBase() {
+		return rebasePreviousBase;
 	}
 
 	public enum CommitType {
