@@ -57,7 +57,7 @@ public class Entity {
 	}
 
 	public void setPath(String path) {
-		this.path = PathUtil.flaten(path);
+		this.path = PathUtil.flatten(path);
 	}
 
 	public Date getStart() {

@@ -126,7 +126,7 @@ public class VersionControlHelper {
 					// Add all branch time ranges to selection criteria
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
 						branchCriteria.should(boolQuery()
-								.must(termQuery("path", PathUtil.flaten(branchTimeRange.getPath())))
+								.must(termQuery("path", PathUtil.flatten(branchTimeRange.getPath())))
 								.must(rangeQuery("start").gt(branchTimeRange.getStart()))
 								.must(boolQuery()
 										.should(boolQuery().mustNot(existsQuery("end")))

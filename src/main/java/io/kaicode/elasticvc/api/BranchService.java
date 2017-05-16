@@ -71,13 +71,13 @@ public class BranchService {
 
 	public Branch findLatest(String path) {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
-		final String flatPath = PathUtil.flaten(path);
+		final String flatPath = PathUtil.flatten(path);
 		final boolean pathIsMain = path.equals("MAIN");
 
 		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", flatPath));
 		if (!pathIsMain) {
 			// Pick up the parent branch too
-			pathClauses.should(termQuery("path", PathUtil.flaten(PathUtil.getParentPath(PathUtil.fatten(path)))));
+			pathClauses.should(termQuery("path", PathUtil.flatten(PathUtil.getParentPath(PathUtil.fatten(path)))));
 		}
 
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder().withQuery(
@@ -127,7 +127,7 @@ public class BranchService {
 	public Branch findAtTimepointOrThrow(String path, Date base) {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder().withQuery(
 				new BoolQueryBuilder()
-						.must(termQuery("path", PathUtil.flaten(path)))
+						.must(termQuery("path", PathUtil.flatten(path)))
 						.must(rangeQuery("start").lte(base))
 						.must(boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
@@ -151,7 +151,7 @@ public class BranchService {
 
 	public List<Branch> findChildren(String path) {
 		return elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
-				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", PathUtil.flaten(path + "/"))))
+				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", PathUtil.flatten(path + "/"))))
 				.withSort(new FieldSortBuilder("path"))
 				.build(), Branch.class);
 	}
@@ -252,7 +252,7 @@ public class BranchService {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(
 					new BoolQueryBuilder()
-							.must(termQuery("path", PathUtil.flaten(path)))
+							.must(termQuery("path", PathUtil.flatten(path)))
 							.mustNot(existsQuery("end"))
 					)
 				.withPageable(new PageRequest(0, 1))

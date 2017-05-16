@@ -13,7 +13,7 @@ public class PathUtil {
 		return null;
 	}
 
-	public static String flaten(String path) {
+	public static String flatten(String path) {
 		if (path != null) {
 			return path.replace("/", "_");
 		} else {
