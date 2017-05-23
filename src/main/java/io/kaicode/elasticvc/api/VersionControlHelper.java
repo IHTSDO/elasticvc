@@ -45,6 +45,10 @@ public class VersionControlHelper {
 
 	public QueryBuilder getChangesOnBranchCriteria(String path) {
 		final Branch branch = getBranchOrThrow(path);
+		return getChangesOnBranchCriteria(branch);
+	}
+
+	public QueryBuilder getChangesOnBranchCriteria(Branch branch) {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY, null);
 	}
 
