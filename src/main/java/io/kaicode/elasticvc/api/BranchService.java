@@ -176,7 +176,7 @@ public class BranchService {
 	}
 
 	public Commit openCommit(String path, Commit.CommitType commitType) {
-		Branch branch = findLatest(path);
+		Branch branch = findBranchOrThrow(path);
 		branch = lockBranch(branch);
 		return new Commit(branch, commitType);
 	}
