@@ -39,11 +39,18 @@ public class BranchService {
 	}
 
 	public Branch create(String path) {
+		return doCreate(path, false, new Date());
+	}
+
+	public Branch recursiveCreate(String path) {
+		return doCreate(path, true, new Date());
+	}
+
+	private Branch doCreate(String path, boolean recursive, Date commitTimepoint) {
 		Assert.notNull(path, "Branch path can not be null.");
-		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character.");
+		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
 
 		logger.debug("Attempting to create branch {}", path);
-		Date commitTimepoint = new Date();
 		if (findLatest(path) != null) {
 			throw new IllegalArgumentException("Branch '" + path + "' already exists.");
 		}
@@ -52,7 +59,11 @@ public class BranchService {
 		if (parentPath != null) {
 			parentBranch = findLatest(parentPath);
 			if (parentBranch == null) {
-				throw new IllegalStateException("Parent branch '" + parentPath + "' does not exist.");
+				if (recursive) {
+					doCreate(parentPath, true, commitTimepoint);
+				} else {
+					throw new IllegalStateException("Parent branch '" + parentPath + "' does not exist.");
+				}
 			}
 			logger.debug("Parent branch {}", parentBranch);
 		}
