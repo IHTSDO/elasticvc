@@ -34,6 +34,7 @@ public class ComponentService {
 	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchCrudRepository<C, String> repository) {
 		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchCrudRepository.class, repository.getClass());
 		Class<C> componentClass = (Class<C>) classes[0];
+		commit.addDomainEntityClass(componentClass);
 		final List<C> changedOrDeletedComponents = components.stream().filter(component -> component.isChanged() || component.isDeleted()).collect(Collectors.toList());
 		final Set<String> deletedComponentIds = changedOrDeletedComponents.stream().filter(DomainEntity::isDeleted).map(DomainEntity::getId).collect(Collectors.toSet());
 		commit.addVersionsDeleted(deletedComponentIds);

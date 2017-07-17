@@ -13,6 +13,7 @@ import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.elasticsearch.repository.ElasticsearchCrudRepository;
 import org.springframework.data.util.CloseableIterator;
+import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import java.util.*;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 import static io.kaicode.elasticvc.api.VersionControlHelper.ContentSelection.CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY;
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
+@Service
 public class VersionControlHelper {
 
 	@Autowired

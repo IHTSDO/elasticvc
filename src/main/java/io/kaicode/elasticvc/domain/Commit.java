@@ -3,8 +3,9 @@ package io.kaicode.elasticvc.domain;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 
-public class Commit {
+public class Commit implements AutoCloseable {
 
 	private Branch branch;
 
@@ -14,16 +15,40 @@ public class Commit {
 	private Set<String> entityVersionsReplaced;
 	private Set<String> entityVersionsDeleted;
 	private Set<String> versionsDeletedOnParentFromRebase;
+	private final Set<Class> domainEntityClasses;
 
 	private CommitType commitType;
 	private String sourceBranchPath;
+	private final Consumer<Commit> onSuccess;
+	private final Consumer<Commit> onFailure;
+	private boolean successful;
 
-	public Commit(Branch branch, CommitType commitType) {
+	public Commit(Branch branch, CommitType commitType, Consumer<Commit> onSuccess, Consumer<Commit> onFailure) {
 		this.branch = branch;
 		this.timepoint = new Date();
 		entityVersionsReplaced = new HashSet<>();
 		entityVersionsDeleted = new HashSet<>();
+		domainEntityClasses = new HashSet<>();
 		this.commitType = commitType;
+		this.onSuccess = onSuccess;
+		this.onFailure = onFailure;
+	}
+
+	public <C extends DomainEntity> void addDomainEntityClass(Class<C> domainEntityClass) {
+		this.domainEntityClasses.add(domainEntityClass);
+	}
+
+	public void markSuccessful() {
+		successful = true;
+	}
+
+	@Override
+	public void close() {
+		if (successful) {
+			onSuccess.accept(this);
+		} else {
+			onFailure.accept(this);
+		}
 	}
 
 	public Branch getBranch() {
@@ -36,14 +61,6 @@ public class Commit {
 
 	public CommitType getCommitType() {
 		return commitType;
-	}
-
-	@Override
-	public String toString() {
-		return "Commit{" +
-				"branch=" + branch +
-				", timepoint=" + timepoint +
-				'}';
 	}
 
 	public String getFlatBranchPath() {
@@ -102,7 +119,19 @@ public class Commit {
 		return rebasePreviousBase;
 	}
 
+	public Set<Class> getDomainEntityClasses() {
+		return domainEntityClasses;
+	}
+
+	@Override
+	public String toString() {
+		return "Commit{" +
+				"branch=" + branch +
+				", timepoint=" + timepoint +
+				'}';
+	}
+
 	public enum CommitType {
-		CONTENT, REBASE, PROMOTION
+		CONTENT, REBASE, PROMOTION;
 	}
 }

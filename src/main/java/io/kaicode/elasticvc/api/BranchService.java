@@ -11,13 +11,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
@@ -175,10 +175,10 @@ public class BranchService {
 		return openCommit(path, Commit.CommitType.CONTENT);
 	}
 
-	public Commit openCommit(String path, Commit.CommitType commitType) {
+	private Commit openCommit(String path, Commit.CommitType commitType) {
 		Branch branch = findBranchOrThrow(path);
 		branch = lockBranch(branch);
-		return new Commit(branch, commitType);
+		return new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
 	}
 
 	public Commit openRebaseCommit(String path) {
@@ -211,7 +211,7 @@ public class BranchService {
 		return branch;
 	}
 
-	public synchronized void completeCommit(Commit commit) {
+	private synchronized void completeCommit(Commit commit) {
 		commitListeners.forEach(c -> c.preCommitCompletion(commit));
 
 		final Date timepoint = commit.getTimepoint();
@@ -259,6 +259,23 @@ public class BranchService {
 		branchRepository.save(newBranchVersionsToSave);
 	}
 
+	private synchronized void rollbackCommit(Commit commit) {
+		// On all indexes touched: delete documents with the path and timepoint of the commit
+		// then remove the write lock from the branch.
+		DeleteQuery deleteQuery = new DeleteQuery();
+		deleteQuery.setQuery(new BoolQueryBuilder()
+				.must(termQuery("path", commit.getFlatBranchPath()))
+				.must(termQuery("start", commit.getTimepoint()))
+		);
+		for (Class domainEntityClass : commit.getDomainEntityClasses()) {
+			elasticsearchTemplate.delete(deleteQuery, domainEntityClass);
+		}
+
+		Branch branch = commit.getBranch();
+		branch.setLocked(false);
+		branchRepository.save(branch);
+	}
+
 	public void unlock(String path) {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(
@@ -294,5 +311,4 @@ public class BranchService {
 		throw new IllegalStateException(message);
 	}
 
-	// TODO - Implement commit rollback; simply delete all entities at commit timepoint from branch and remove write lock.
 }
