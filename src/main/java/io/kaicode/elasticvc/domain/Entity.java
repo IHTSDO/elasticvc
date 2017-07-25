@@ -88,4 +88,14 @@ public class Entity {
 		return deleted;
 	}
 
+	@Override
+	public String toString() {
+		return "Entity{" +
+				"internalId='" + internalId + '\'' +
+				", path='" + path + '\'' +
+				", start=" + start +
+				", end=" + end +
+				", deleted=" + deleted +
+				'}';
+	}
 }

@@ -13,10 +13,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
+import javax.annotation.PostConstruct;
 import java.util.*;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
@@ -51,7 +53,7 @@ public class BranchService {
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
 
 		logger.debug("Attempting to create branch {}", path);
-		if (findLatest(path) != null) {
+		if (exists(path)) {
 			throw new IllegalArgumentException("Branch '" + path + "' already exists.");
 		}
 		final String parentPath = PathUtil.getParentPath(path);
@@ -76,32 +78,23 @@ public class BranchService {
 		return doSave(branch).setState(Branch.BranchState.UP_TO_DATE);
 	}
 
+	public boolean exists(String path) {
+		return elasticsearchTemplate.count(getBranchQuery(path), Branch.class) > 0;
+	}
+
 	public void deleteAll() {
 		branchRepository.deleteAll();
 	}
 
 	public Branch findLatest(String path) {
-		Assert.notNull(path, "The path argument is required, it must not be null.");
-		final String flatPath = PathUtil.flatten(path);
-		final boolean pathIsMain = path.equals("MAIN");
-
-		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", flatPath));
-		if (!pathIsMain) {
-			// Pick up the parent branch too
-			pathClauses.should(termQuery("path", PathUtil.flatten(PathUtil.getParentPath(PathUtil.fatten(path)))));
-		}
-
-		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder().withQuery(
-				new BoolQueryBuilder()
-						.must(pathClauses)
-						.mustNot(existsQuery("end"))
-		).build(), Branch.class);
+		NativeSearchQuery query = getBranchQuery(path);
+		final List<Branch> branches = elasticsearchTemplate.queryForList(query, Branch.class);
 
 		Branch branch = null;
 		Branch parentBranch = null;
 
 		for (Branch b : branches) {
-			if (b.getPath().equals(flatPath)) {
+			if (b.getPath().equals(PathUtil.flatten(path))) {
 				if (branch != null) {
 					return illegalState("There should not be more than one version of branch " + path + " with no end date.");
 				}
@@ -115,7 +108,7 @@ public class BranchService {
 			return null;
 		}
 
-		if (pathIsMain) {
+		if (path.equals("MAIN")) {
 			return branch.setState(Branch.BranchState.UP_TO_DATE);
 		}
 
@@ -125,6 +118,23 @@ public class BranchService {
 
 		branch.updateState(parentBranch.getHead());
 		return branch;
+	}
+
+	private NativeSearchQuery getBranchQuery(String path) {
+		Assert.notNull(path, "The path argument is required, it must not be null.");
+		final boolean pathIsMain = path.equals("MAIN");
+
+		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", PathUtil.flatten(path)));
+		if (!pathIsMain) {
+			// Pick up the parent branch too
+			pathClauses.should(termQuery("path", PathUtil.flatten(PathUtil.getParentPath(PathUtil.fatten(path)))));
+		}
+
+		return new NativeSearchQueryBuilder().withQuery(
+				new BoolQueryBuilder()
+						.must(pathClauses)
+						.mustNot(existsQuery("end"))
+		).build();
 	}
 
 	public Branch findBranchOrThrow(String path) {
@@ -203,7 +213,7 @@ public class BranchService {
 	// TODO Make this work in a clustered environment
 	private synchronized Branch lockBranch(Branch branch) {
 		if (branch.isLocked()) {
-			throw new IllegalStateException("Branch already locked");
+			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getFatPath()));
 		}
 
 		branch.setLocked(true);
