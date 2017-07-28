@@ -11,14 +11,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-import javax.annotation.PostConstruct;
 import java.util.*;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
@@ -79,7 +77,7 @@ public class BranchService {
 	}
 
 	public boolean exists(String path) {
-		return elasticsearchTemplate.count(getBranchQuery(path), Branch.class) > 0;
+		return elasticsearchTemplate.count(getBranch(path, false), Branch.class) > 0;
 	}
 
 	public void deleteAll() {
@@ -87,7 +85,7 @@ public class BranchService {
 	}
 
 	public Branch findLatest(String path) {
-		NativeSearchQuery query = getBranchQuery(path);
+		NativeSearchQuery query = getBranch(path, true);
 		final List<Branch> branches = elasticsearchTemplate.queryForList(query, Branch.class);
 
 		Branch branch = null;
@@ -120,12 +118,11 @@ public class BranchService {
 		return branch;
 	}
 
-	private NativeSearchQuery getBranchQuery(String path) {
+	private NativeSearchQuery getBranch(String path, boolean includeParent) {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
-		final boolean pathIsMain = path.equals("MAIN");
 
 		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", PathUtil.flatten(path)));
-		if (!pathIsMain) {
+		if (includeParent && !path.equals("MAIN")) {
 			// Pick up the parent branch too
 			pathClauses.should(termQuery("path", PathUtil.flatten(PathUtil.getParentPath(PathUtil.fatten(path)))));
 		}
