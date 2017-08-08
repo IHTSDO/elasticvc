@@ -257,6 +257,7 @@ public class BranchService {
 			newSourceBranch.setBase(timepoint);
 			newSourceBranch.setStart(timepoint);
 			newSourceBranch.setHead(timepoint);
+			newSourceBranch.setLastPromotion(timepoint);
 			newSourceBranch.setContainsContent(false);
 			newBranchVersionsToSave.add(newSourceBranch);
 			logger.debug("Updating branch base and clearing versionsReplaced {}", newSourceBranch);
