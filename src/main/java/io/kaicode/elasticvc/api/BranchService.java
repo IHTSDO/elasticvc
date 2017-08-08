@@ -34,7 +34,7 @@ public class BranchService {
 
 	private final List<CommitListener> commitListeners;
 
-	final Logger logger = LoggerFactory.getLogger(getClass());
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	public BranchService() {
 		commitListeners = new ArrayList<>();
@@ -272,7 +272,7 @@ public class BranchService {
 		// then remove the write lock from the branch.
 		DeleteQuery deleteQuery = new DeleteQuery();
 		deleteQuery.setQuery(new BoolQueryBuilder()
-				.must(termQuery("path", commit.getFlatBranchPath()))
+				.must(termQuery("path", commit.getBranch().getPath()))
 				.must(termQuery("start", commit.getTimepoint()))
 		);
 		for (Class domainEntityClass : commit.getDomainEntityClasses()) {

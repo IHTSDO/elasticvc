@@ -63,10 +63,6 @@ public class Commit implements AutoCloseable {
 		return commitType;
 	}
 
-	public String getFlatBranchPath() {
-		return branch.getFlatPath();
-	}
-
 	public void addVersionsReplaced(Set<String> internalIds) {
 		entityVersionsReplaced.addAll(internalIds);
 	}

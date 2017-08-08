@@ -1,7 +1,6 @@
 package io.kaicode.elasticvc.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import io.kaicode.elasticvc.api.PathUtil;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldIndex;

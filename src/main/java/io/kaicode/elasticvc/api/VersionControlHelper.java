@@ -65,7 +65,7 @@ public class VersionControlHelper {
 	public BoolQueryBuilder getUpdatesOnBranchDuringRangeCriteria(String path, Date start, Date end) {
 		final Branch branch = getBranchOrThrow(path);
 		return boolQuery()
-				.must(termQuery("path", branch.getFlatPath()))
+				.must(termQuery("path", branch.getPath()))
 				.must(boolQuery()
 						.should(rangeQuery("start").gte(start).lte(end))
 						.should(rangeQuery("end").gte(start).lte(end))
@@ -83,7 +83,7 @@ public class VersionControlHelper {
 	private BoolQueryBuilder getBranchCriteria(Branch branch, Date timepoint, Set<String> versionsReplaced, ContentSelection contentSelection, Commit commit) {
 		final BoolQueryBuilder boolQueryShouldClause = boolQuery();
 		final BoolQueryBuilder branchCriteria =
-				boolQuery().should(boolQueryShouldClause.must(termQuery("path", branch.getFlatPath())));
+				boolQuery().should(boolQueryShouldClause.must(termQuery("path", branch.getPath())));
 
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
@@ -147,7 +147,7 @@ public class VersionControlHelper {
 		return branchCriteria;
 	}
 
-	void addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Set<String> versionsReplaced) {
+	private void addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Set<String> versionsReplaced) {
 		String parentPath = PathUtil.getParentPath(branch.getPath());
 		if (parentPath != null) {
 			final Branch parentBranch = branchService.findAtTimepointOrThrow(parentPath, branch.getBase());
@@ -155,7 +155,7 @@ public class VersionControlHelper {
 			versionsReplaced.addAll(parentBranch.getVersionsReplaced());
 			final Date base = branch.getBase();
 			branchCriteria.should(boolQuery()
-					.must(termQuery("path", parentBranch.getFlatPath()))
+					.must(termQuery("path", parentBranch.getPath()))
 					.must(rangeQuery("start").lte(base))
 					.must(boolQuery()
 							.should(boolQuery().mustNot(existsQuery("end")))
@@ -171,7 +171,7 @@ public class VersionControlHelper {
 		final NativeSearchQuery query = new NativeSearchQueryBuilder()
 				.withQuery(
 						new BoolQueryBuilder()
-								.must(termQuery("path", commit.getFlatBranchPath()))
+								.must(termQuery("path", commit.getBranch().getPath()))
 								.must(rangeQuery("start").lt(commit.getTimepoint()))
 								.mustNot(existsQuery("end"))
 				)
@@ -233,7 +233,7 @@ public class VersionControlHelper {
 	}
 
 	private void doSetEntityMeta(Commit commit, Entity entity) {
-		entity.setPath(commit.getFlatBranchPath());
+		entity.setPath(commit.getBranch().getPath());
 		entity.setStart(commit.getTimepoint());
 		entity.setEnd(null);
 		entity.clearInternalId();
@@ -252,7 +252,7 @@ public class VersionControlHelper {
 		private Date start;
 		private Date end;
 
-		public BranchTimeRange(String path, Date start, Date end) {
+		BranchTimeRange(String path, Date start, Date end) {
 			this.path = path;
 			this.start = start;
 			this.end = end;

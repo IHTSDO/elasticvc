@@ -34,7 +34,7 @@ public class Branch extends Entity {
 	private BranchState state;
 
 	public enum BranchState {
-		UP_TO_DATE, FORWARD, BEHIND, DIVERGED;
+		UP_TO_DATE, FORWARD, BEHIND, DIVERGED
 	}
 
 	public Branch() {
@@ -86,11 +86,6 @@ public class Branch extends Entity {
 
 	public long getHeadTimestamp() {
 		return head.getTime();
-	}
-
-	@JsonIgnore
-	public String getFlatPath() {
-		return getPath();
 	}
 
 	public void setHead(Date head) {
