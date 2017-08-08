@@ -17,7 +17,9 @@ import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilde
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
@@ -92,7 +94,7 @@ public class BranchService {
 		Branch parentBranch = null;
 
 		for (Branch b : branches) {
-			if (b.getPath().equals(PathUtil.flatten(path))) {
+			if (b.getPath().equals(path)) {
 				if (branch != null) {
 					return illegalState("There should not be more than one version of branch " + path + " with no end date.");
 				}
@@ -121,10 +123,10 @@ public class BranchService {
 	private NativeSearchQuery getBranch(String path, boolean includeParent) {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
 
-		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", PathUtil.flatten(path)));
+		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", path));
 		if (includeParent && !path.equals("MAIN")) {
 			// Pick up the parent branch too
-			pathClauses.should(termQuery("path", PathUtil.flatten(PathUtil.getParentPath(PathUtil.fatten(path)))));
+			pathClauses.should(termQuery("path", PathUtil.getParentPath(path)));
 		}
 
 		return new NativeSearchQueryBuilder().withQuery(
@@ -145,7 +147,7 @@ public class BranchService {
 	public Branch findAtTimepointOrThrow(String path, Date base) {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder().withQuery(
 				new BoolQueryBuilder()
-						.must(termQuery("path", PathUtil.flatten(path)))
+						.must(termQuery("path", path))
 						.must(rangeQuery("start").lte(base))
 						.must(boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
@@ -169,7 +171,7 @@ public class BranchService {
 
 	public List<Branch> findChildren(String path) {
 		return elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
-				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", PathUtil.flatten(path + "/"))))
+				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", path + "/")))
 				.withSort(new FieldSortBuilder("path"))
 				.build(), Branch.class);
 	}
@@ -191,9 +193,8 @@ public class BranchService {
 	public Commit openRebaseCommit(String path) {
 		final Commit commit = openCommit(path, Commit.CommitType.REBASE);
 		final Branch branch = commit.getBranch();
-		final String fatPath = branch.getFatPath();
-		if (!PathUtil.isRoot(fatPath)) {
-			final String parentPath = PathUtil.getParentPath(fatPath);
+		if (!PathUtil.isRoot(path)) {
+			final String parentPath = PathUtil.getParentPath(path);
 			final Branch parentBranch = findAtTimepointOrThrow(parentPath, commit.getTimepoint());
 			commit.setRebasePreviousBase(branch.getBase());
 			branch.setBase(parentBranch.getHead());
@@ -210,7 +211,7 @@ public class BranchService {
 	// TODO Make this work in a clustered environment
 	private synchronized Branch lockBranch(Branch branch) {
 		if (branch.isLocked()) {
-			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getFatPath()));
+			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
 		}
 
 		branch.setLocked(true);
@@ -287,7 +288,7 @@ public class BranchService {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(
 					new BoolQueryBuilder()
-							.must(termQuery("path", PathUtil.flatten(path)))
+							.must(termQuery("path", path))
 							.mustNot(existsQuery("end"))
 					)
 				.withPageable(new PageRequest(0, 1))

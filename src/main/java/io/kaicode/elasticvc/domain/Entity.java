@@ -39,11 +39,6 @@ public class Entity {
 		return this;
 	}
 
-	@JsonIgnore
-	public String getFatPath() {
-		return PathUtil.fatten(path);
-	}
-
 	public String getInternalId() {
 		return internalId;
 	}
@@ -57,7 +52,7 @@ public class Entity {
 	}
 
 	public void setPath(String path) {
-		this.path = PathUtil.flatten(path);
+		this.path = path;
 	}
 
 	public Date getStart() {

@@ -65,9 +65,9 @@ public class Branch extends Entity {
 	}
 
 	public boolean isParent(Branch otherBranch) {
-		final String childPath = otherBranch.getFatPath();
+		final String childPath = otherBranch.getPath();
 		final int endIndex = childPath.lastIndexOf("/");
-		return endIndex > 0 && getFatPath().equals(childPath.substring(0, endIndex));
+		return endIndex > 0 && getPath().equals(childPath.substring(0, endIndex));
 	}
 
 	public void addVersionsReplaced(Set<String> internalIds) {

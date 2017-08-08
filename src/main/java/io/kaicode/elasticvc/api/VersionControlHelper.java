@@ -120,7 +120,7 @@ public class VersionControlHelper {
 					// Collect previous and new base timepoints on all ancestor branches
 					List<BranchTimeRange> branchTimeRanges = new ArrayList<>();
 					Date tempBase = commit.getRebasePreviousBase();
-					String parentPath = branch.getFatPath();
+					String parentPath = branch.getPath();
 					while ((parentPath = PathUtil.getParentPath(parentPath)) != null) {
 						Branch latestVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, commit.getTimepoint());
 						branchTimeRanges.add(new BranchTimeRange(parentPath, tempBase, latestVersionOfParent.getHead()));
@@ -132,7 +132,7 @@ public class VersionControlHelper {
 					// Add all branch time ranges to selection criteria
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
 						branchCriteria.should(boolQuery()
-								.must(termQuery("path", PathUtil.flatten(branchTimeRange.getPath())))
+								.must(termQuery("path", branchTimeRange.getPath()))
 								.must(rangeQuery("start").gt(branchTimeRange.getStart()))
 								.must(boolQuery()
 										.should(boolQuery().mustNot(existsQuery("end")))
@@ -148,7 +148,7 @@ public class VersionControlHelper {
 	}
 
 	void addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Set<String> versionsReplaced) {
-		String parentPath = PathUtil.getParentPath(branch.getFatPath());
+		String parentPath = PathUtil.getParentPath(branch.getPath());
 		if (parentPath != null) {
 			final Branch parentBranch = branchService.findAtTimepointOrThrow(parentPath, branch.getBase());
 			versionsReplaced = new HashSet<>(versionsReplaced);
