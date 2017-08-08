@@ -11,7 +11,8 @@ import java.util.Date;
 
 public class Entity {
 
-	public static final SimpleDateFormat DEBUG_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+	public static final String DATE_FORMAT_STRING = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
+	public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT_STRING);
 
 	@Id
 	@Field(index = FieldIndex.not_analyzed)
@@ -58,8 +59,9 @@ public class Entity {
 		return start;
 	}
 
+	@JsonIgnore
 	public String getStartDebugFormat() {
-		return start == null ? null : DEBUG_DATE_FORMAT.format(start);
+		return start == null ? null : DATE_FORMAT.format(start);
 	}
 
 	public void setStart(Date start) {
@@ -70,8 +72,9 @@ public class Entity {
 		return end;
 	}
 
+	@JsonIgnore
 	public String getEndDebugFormat() {
-		return end == null ? null : DEBUG_DATE_FORMAT.format(end);
+		return end == null ? null : DATE_FORMAT.format(end);
 	}
 
 	public void setEnd(Date end) {
