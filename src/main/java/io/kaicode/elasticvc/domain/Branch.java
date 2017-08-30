@@ -8,6 +8,7 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @Document(type = "branch", indexName = "branch", shards = 8)
@@ -32,6 +33,9 @@ public class Branch extends Entity {
 	private Set<String> versionsReplaced;
 
 	private BranchState state;
+
+	@Field(type = FieldType.Object)
+	private Map<String, String> metadata;
 
 	public enum BranchState {
 		UP_TO_DATE, FORWARD, BEHIND, DIVERGED
@@ -145,6 +149,14 @@ public class Branch extends Entity {
 	public Branch setState(BranchState state) {
 		this.state = state;
 		return this;
+	}
+
+	public Map<String, String> getMetadata() {
+		return metadata;
+	}
+
+	public void setMetadata(Map<String, String> metadata) {
+		this.metadata = metadata;
 	}
 
 	@Override

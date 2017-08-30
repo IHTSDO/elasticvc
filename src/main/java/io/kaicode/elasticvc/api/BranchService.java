@@ -20,6 +20,7 @@ import org.springframework.util.Assert;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
@@ -41,14 +42,18 @@ public class BranchService {
 	}
 
 	public Branch create(String path) {
-		return doCreate(path, false, new Date());
+		return create(path, null);
+	}
+
+	public Branch create(String path, Map<String, String> metadata) {
+		return doCreate(path, false, new Date(), metadata);
 	}
 
 	public Branch recursiveCreate(String path) {
-		return doCreate(path, true, new Date());
+		return doCreate(path, true, new Date(), null);
 	}
 
-	private Branch doCreate(String path, boolean recursive, Date commitTimepoint) {
+	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Map<String, String> metadata) {
 		Assert.notNull(path, "Branch path can not be null.");
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
 
@@ -62,7 +67,7 @@ public class BranchService {
 			parentBranch = findLatest(parentPath);
 			if (parentBranch == null) {
 				if (recursive) {
-					doCreate(parentPath, true, commitTimepoint);
+					doCreate(parentPath, true, commitTimepoint, null);
 				} else {
 					throw new IllegalStateException("Parent branch '" + parentPath + "' does not exist.");
 				}
@@ -74,12 +79,13 @@ public class BranchService {
 		branch.setBase(parentBranch == null ? commitTimepoint : parentBranch.getHead());
 		branch.setHead(commitTimepoint);
 		branch.setStart(commitTimepoint);
+		branch.setMetadata(metadata);
 		logger.info("Creating branch {}", branch);
 		return doSave(branch).setState(Branch.BranchState.UP_TO_DATE);
 	}
 
 	public boolean exists(String path) {
-		return elasticsearchTemplate.count(getBranch(path, false), Branch.class) > 0;
+		return elasticsearchTemplate.count(getBranchQuery(path, false), Branch.class) > 0;
 	}
 
 	public void deleteAll() {
@@ -87,7 +93,7 @@ public class BranchService {
 	}
 
 	public Branch findLatest(String path) {
-		NativeSearchQuery query = getBranch(path, true);
+		NativeSearchQuery query = getBranchQuery(path, true);
 		final List<Branch> branches = elasticsearchTemplate.queryForList(query, Branch.class);
 
 		Branch branch = null;
@@ -120,7 +126,7 @@ public class BranchService {
 		return branch;
 	}
 
-	private NativeSearchQuery getBranch(String path, boolean includeParent) {
+	private NativeSearchQuery getBranchQuery(String path, boolean includeParent) {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
 
 		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", path));
@@ -137,9 +143,33 @@ public class BranchService {
 	}
 
 	public Branch findBranchOrThrow(String path) {
+		return findBranchOrThrow(path, false);
+	}
+
+	public Branch findBranchOrThrow(String path, boolean includeInheritedMetadata) {
 		final Branch branch = findLatest(path);
 		if (branch == null) {
 			throw new BranchNotFoundException("Branch '" + path + "' does not exist.");
+		}
+		if (includeInheritedMetadata) {
+			String parentPath = PathUtil.getParentPath(branch.getPath());
+			if (parentPath != null) {
+				Branch parent = findBranchOrThrow(parentPath, true);
+				Map<String, String> parentMetadata = parent.getMetadata();
+				if (parentMetadata != null) {
+					Map<String, String> metadata = branch.getMetadata();
+					if (metadata != null) {
+						for (String key : parentMetadata.keySet()) {
+							if (!metadata.containsKey(key)) {
+								metadata.put(key, parentMetadata.get(key));
+							}
+						}
+					} else {
+						metadata = parentMetadata;
+					}
+					branch.setMetadata(metadata);
+				}
+			}
 		}
 		return branch;
 	}
@@ -319,5 +349,4 @@ public class BranchService {
 		logger.error(message);
 		throw new IllegalStateException(message);
 	}
-
 }

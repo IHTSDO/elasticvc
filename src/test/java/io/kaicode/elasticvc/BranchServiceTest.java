@@ -137,6 +137,41 @@ public class BranchServiceTest {
 		assertFalse(branchService.exists("MAIN/AA/B"));
 	}
 
+	@Test
+	public void testMetadata() {
+		Map<String, String> metadata = new HashMap<>();
+		metadata.put("something", "123");
+		metadata.put("something-else", "456");
+		branchService.create("MAIN", metadata);
+
+		Branch main = branchService.findLatest("MAIN");
+		assertEquals(metadata, main.getMetadata());
+	}
+
+	@Test
+	public void testLoadInheritedMetadata() {
+		Map<String, String> metadataA = new HashMap<>();
+		metadataA.put("A", "A1");
+		metadataA.put("B", "B1");
+		branchService.create("MAIN", metadataA);
+
+		branchService.create("MAIN/one");
+
+		Map<String, String> metadataB = new HashMap<>();
+		metadataB.put("B", "B2");
+		metadataB.put("C", "C2");
+		branchService.create("MAIN/one/two", metadataB);
+
+		Map<String, String> mergedMetadata = new HashMap<>();
+		mergedMetadata.put("A", "A1");
+		mergedMetadata.put("B", "B2");
+		mergedMetadata.put("C", "C2");
+
+		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata());
+		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN/one", true).getMetadata());
+		assertEquals(mergedMetadata, branchService.findBranchOrThrow("MAIN/one/two", true).getMetadata());
+	}
+
 	private void assertBranchState(String path, Branch.BranchState status) {
 		assertEquals(status, branchService.findLatest(path).getState());
 	}
