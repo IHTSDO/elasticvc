@@ -17,10 +17,7 @@ import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilde
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
@@ -218,6 +215,12 @@ public class BranchService {
 		Branch branch = findBranchOrThrow(path);
 		branch = lockBranch(branch);
 		return new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+	}
+
+	public Branch updateMetadata(String path, Map<String, String> metadata) {
+		Branch branch = findBranchOrThrow(path);
+		branch.setMetadata(metadata);
+		return doSave(branch);
 	}
 
 	public Commit openRebaseCommit(String path) {
