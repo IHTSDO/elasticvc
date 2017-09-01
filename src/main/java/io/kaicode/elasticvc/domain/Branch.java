@@ -10,6 +10,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Document(type = "branch", indexName = "branch", shards = 8)
 public class Branch extends Entity {
@@ -32,10 +33,10 @@ public class Branch extends Entity {
 	// The internal ids of entities visible on ancestor branches which have been replaced or deleted on this branch
 	private Set<String> versionsReplaced;
 
-	private BranchState state;
-
 	@Field(type = FieldType.Object)
-	private Map<String, String> metadata;
+	private Map<String, String> metadataInternal;
+
+	private BranchState state;
 
 	public enum BranchState {
 		UP_TO_DATE, FORWARD, BEHIND, DIVERGED
@@ -152,11 +153,30 @@ public class Branch extends Entity {
 	}
 
 	public Map<String, String> getMetadata() {
-		return metadata;
+		return replaceMapKeyCharacters(metadataInternal, "|", ".");
 	}
 
 	public void setMetadata(Map<String, String> metadata) {
-		this.metadata = metadata;
+		this.metadataInternal = replaceMapKeyCharacters(metadata, ".", "|");
+	}
+
+	public Map<String, String> getMetadataInternal() {
+		return metadataInternal;
+	}
+
+	public void setMetadataInternal(Map<String, String> metadataInternal) {
+		this.metadataInternal = metadataInternal;
+	}
+
+	private Map<String, String> replaceMapKeyCharacters(Map<String, String> metadata, String s1, String s2) {
+		if (metadata != null) {
+			Set<String> replaceKeys = metadata.keySet().stream().filter(k -> k.contains(s1)).collect(Collectors.toSet());
+			for (String key : replaceKeys) {
+				metadata.put(key.replace(s1, s2), metadata.get(key));
+				metadata.remove(key);
+			}
+		}
+		return metadata;
 	}
 
 	@Override

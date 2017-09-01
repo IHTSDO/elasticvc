@@ -17,7 +17,10 @@ import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilde
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
@@ -76,9 +79,9 @@ public class BranchService {
 		branch.setBase(parentBranch == null ? commitTimepoint : parentBranch.getHead());
 		branch.setHead(commitTimepoint);
 		branch.setStart(commitTimepoint);
-		branch.setMetadata(metadata);
+		branch.setMetadataInternal(metadata);
 		logger.info("Creating branch {}", branch);
-		return doSave(branch).setState(Branch.BranchState.UP_TO_DATE);
+		return branchRepository.save(branch).setState(Branch.BranchState.UP_TO_DATE);
 	}
 
 	public boolean exists(String path) {
@@ -164,7 +167,7 @@ public class BranchService {
 					} else {
 						metadata = parentMetadata;
 					}
-					branch.setMetadata(metadata);
+					branch.setMetadataInternal(metadata);
 				}
 			}
 		}
@@ -220,7 +223,7 @@ public class BranchService {
 	public Branch updateMetadata(String path, Map<String, String> metadata) {
 		Branch branch = findBranchOrThrow(path);
 		branch.setMetadata(metadata);
-		return doSave(branch);
+		return branchRepository.save(branch);
 	}
 
 	public Commit openRebaseCommit(String path) {
@@ -248,8 +251,7 @@ public class BranchService {
 		}
 
 		branch.setLocked(true);
-		branch = doSave(branch);
-		return branch;
+		return branchRepository.save(branch);
 	}
 
 	private synchronized void completeCommit(Commit commit) {
@@ -331,7 +333,7 @@ public class BranchService {
 		if (!branches.isEmpty()) {
 			final Branch branch = branches.get(0);
 			branch.setLocked(false);
-			doSave(branch);
+			branchRepository.save(branch);
 		} else {
 			throw new IllegalArgumentException("Branch not found " + path);
 		}
@@ -341,11 +343,6 @@ public class BranchService {
 		if (!commitListeners.contains(commitListener)) {
 			commitListeners.add(commitListener);
 		}
-	}
-
-	private Branch doSave(Branch branch) {
-		branch.setState(null);
-		return branchRepository.save(branch);
 	}
 
 	private Branch illegalState(String message) {
