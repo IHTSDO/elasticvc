@@ -114,7 +114,8 @@ public class BranchService {
 			return null;
 		}
 
-		if (path.equals("MAIN")) {
+		if (!path.contains(PathUtil.SEPARATOR)) {
+			// Root branch is always up to date
 			return branch.setState(Branch.BranchState.UP_TO_DATE);
 		}
 
@@ -130,7 +131,7 @@ public class BranchService {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
 
 		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", path));
-		if (includeParent && !path.equals("MAIN")) {
+		if (includeParent && path.contains(PathUtil.SEPARATOR)) {
 			// Pick up the parent branch too
 			pathClauses.should(termQuery("path", PathUtil.getParentPath(path)));
 		}
