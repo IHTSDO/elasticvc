@@ -41,6 +41,11 @@ public class VersionControlHelper {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
+	public QueryBuilder getBranchCriteriaBeforeOpenCommit(Commit commit) {
+		Branch branch = commit.getBranch();
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
+	}
+
 	public QueryBuilder getBranchCriteriaIncludingOpenCommit(Commit commit) {
 		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
 	}
@@ -88,8 +93,18 @@ public class VersionControlHelper {
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
 				// On this branch and started not ended
-				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint))
-						.mustNot(existsQuery("end"));
+				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint));
+				if (commit != null) {
+					boolQueryShouldClause.must(
+							boolQuery()
+									// If there is a commit started then components should either have not ended
+									// or should have ended at the time of the current commit
+									.should(boolQuery().mustNot(existsQuery("end")))
+									.should(termQuery("end", commit.getTimepoint()))
+					);
+				} else {
+					boolQueryShouldClause.mustNot(existsQuery("end"));
+				}
 				// Or any parent branch within time constraints
 				addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
 				break;
