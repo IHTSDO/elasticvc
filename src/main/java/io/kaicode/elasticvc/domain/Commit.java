@@ -1,5 +1,6 @@
 package io.kaicode.elasticvc.domain;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
@@ -7,17 +8,16 @@ import java.util.function.Consumer;
 
 public class Commit implements AutoCloseable {
 
-	private Branch branch;
+	private final Branch branch;
 
-	private Date timepoint;
+	private final Date timepoint;
 	private Date rebasePreviousBase;
 
-	private Set<String> entityVersionsReplaced;
-	private Set<String> entityVersionsDeleted;
-	private Set<String> versionsDeletedOnParentFromRebase;
+	private final Set<String> entityVersionsReplaced;
+	private final Set<String> entityVersionsDeleted;
 	private final Set<Class> domainEntityClasses;
 
-	private CommitType commitType;
+	private final CommitType commitType;
 	private String sourceBranchPath;
 	private final Consumer<Commit> onSuccess;
 	private final Consumer<Commit> onFailure;
@@ -26,9 +26,9 @@ public class Commit implements AutoCloseable {
 	public Commit(Branch branch, CommitType commitType, Consumer<Commit> onSuccess, Consumer<Commit> onFailure) {
 		this.branch = branch;
 		this.timepoint = new Date();
-		entityVersionsReplaced = new HashSet<>();
-		entityVersionsDeleted = new HashSet<>();
-		domainEntityClasses = new HashSet<>();
+		entityVersionsReplaced = Collections.synchronizedSet(new HashSet<>());
+		entityVersionsDeleted = Collections.synchronizedSet(new HashSet<>());
+		domainEntityClasses = Collections.synchronizedSet(new HashSet<>());
 		this.commitType = commitType;
 		this.onSuccess = onSuccess;
 		this.onFailure = onFailure;
@@ -85,14 +85,6 @@ public class Commit implements AutoCloseable {
 
 	public Set<String> getEntityVersionsDeleted() {
 		return entityVersionsDeleted;
-	}
-
-	public Set<String> getVersionsDeletedOnParentFromRebase() {
-		return versionsDeletedOnParentFromRebase;
-	}
-
-	public void setVersionsDeletedOnParentFromRebase(Set<String> versionsDeletedOnParentFromRebase) {
-		this.versionsDeletedOnParentFromRebase = versionsDeletedOnParentFromRebase;
 	}
 
 	public void setSourceBranchPath(String sourceBranchPath) {
