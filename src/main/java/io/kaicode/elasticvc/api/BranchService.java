@@ -256,7 +256,17 @@ public class BranchService {
 	}
 
 	private synchronized void completeCommit(Commit commit) {
-		commitListeners.forEach(c -> c.preCommitCompletion(commit));
+		try {
+			for (CommitListener commitListener : commitListeners) {
+				commitListener.preCommitCompletion(commit);
+			}
+		} catch (IllegalStateException e) {
+			logger.error("Commit commitListener threw IllegalStateException, rolling back commit {} on branch {}",
+					commit.getTimepoint().getTime(), commit.getBranch().getPath(), e);
+
+			rollbackCommit(commit);
+			throw e;
+		}
 
 		final Date timepoint = commit.getTimepoint();
 		final Branch oldBranchTimespan = commit.getBranch();
