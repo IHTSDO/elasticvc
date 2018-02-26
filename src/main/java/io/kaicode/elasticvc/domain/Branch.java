@@ -3,7 +3,6 @@ package io.kaicode.elasticvc.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldIndex;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.util.Date;
@@ -15,19 +14,19 @@ import java.util.stream.Collectors;
 @Document(type = "branch", indexName = "branch", shards = 8)
 public class Branch extends Entity {
 
-	@Field(type = FieldType.Date, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Date)
 	private Date base;
 
-	@Field(type = FieldType.Date, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Date)
 	private Date head;
 
-	@Field(type = FieldType.Date, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Date)
 	private Date lastPromotion;
 
-	@Field(type = FieldType.Boolean, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Boolean)
 	private boolean locked;
 
-	@Field(type = FieldType.Boolean, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Boolean)
 	private boolean containsContent;
 
 	// The internal ids of entities visible on ancestor branches which have been replaced or deleted on this branch

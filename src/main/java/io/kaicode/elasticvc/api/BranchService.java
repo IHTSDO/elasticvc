@@ -1,9 +1,9 @@
 package io.kaicode.elasticvc.api;
 
-import com.google.common.base.Strings;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.repositories.BranchRepository;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.slf4j.Logger;
@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
@@ -31,7 +32,7 @@ public class BranchService {
 	private BranchRepository branchRepository;
 
 	@Autowired
-	private ElasticsearchOperations elasticsearchTemplate;
+	private ElasticsearchTemplate elasticsearchTemplate;
 
 	private final List<CommitListener> commitListeners;
 
@@ -179,10 +180,10 @@ public class BranchService {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder().withQuery(
 				new BoolQueryBuilder()
 						.must(termQuery("path", path))
-						.must(rangeQuery("start").lte(base))
+						.must(rangeQuery("start").lte(base.getTime()))
 						.must(boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
-								.should(rangeQuery("end").gt(base)))
+								.should(rangeQuery("end").gt(base.getTime())))
 			).build(), Branch.class);
 		Assert.isTrue(branches.size() < 2, "There should not be more than one version of a branch at a single timepoint.");
 		if (branches.isEmpty()) {
@@ -311,7 +312,7 @@ public class BranchService {
 
 		logger.debug("Ending branch timespan {}", oldBranchTimespan);
 		logger.debug("Starting branch timespan {}", newBranchTimespan);
-		branchRepository.save(newBranchVersionsToSave);
+		branchRepository.saveAll(newBranchVersionsToSave);
 	}
 
 	private synchronized void rollbackCommit(Commit commit) {
@@ -320,7 +321,7 @@ public class BranchService {
 		DeleteQuery deleteQuery = new DeleteQuery();
 		deleteQuery.setQuery(new BoolQueryBuilder()
 				.must(termQuery("path", commit.getBranch().getPath()))
-				.must(termQuery("start", commit.getTimepoint()))
+				.must(termQuery("start", commit.getTimepoint().getTime()))
 		);
 		for (Class domainEntityClass : commit.getDomainEntityClasses()) {
 			elasticsearchTemplate.delete(deleteQuery, domainEntityClass);

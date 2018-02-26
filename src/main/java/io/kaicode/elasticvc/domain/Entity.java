@@ -15,16 +15,16 @@ public class Entity {
 	public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT_STRING);
 
 	@Id
-	@Field(index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.keyword)
 	private String internalId;
 
-	@Field(type = FieldType.String, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.keyword)
 	private String path;
 
-	@Field(type = FieldType.Date, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Date)
 	private Date start;
 
-	@Field(type = FieldType.Date, index = FieldIndex.not_analyzed)
+	@Field(type = FieldType.Date)
 	private Date end;
 
 	@JsonIgnore

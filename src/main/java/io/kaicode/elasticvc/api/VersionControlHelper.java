@@ -72,8 +72,8 @@ public class VersionControlHelper {
 		return boolQuery()
 				.must(termQuery("path", branch.getPath()))
 				.must(boolQuery()
-						.should(rangeQuery("start").gte(start).lte(end))
-						.should(rangeQuery("end").gte(start).lte(end))
+						.should(rangeQuery("start").gte(start.getTime()).lte(end.getTime()))
+						.should(rangeQuery("end").gte(start.getTime()).lte(end.getTime()))
 				);
 	}
 
@@ -93,14 +93,14 @@ public class VersionControlHelper {
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
 				// On this branch and started not ended
-				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint));
+				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
 				if (commit != null) {
 					boolQueryShouldClause.must(
 							boolQuery()
 									// If there is a commit started then components should either have not ended
 									// or should have ended at the time of the current commit
 									.should(boolQuery().mustNot(existsQuery("end")))
-									.should(termQuery("end", commit.getTimepoint()))
+									.should(termQuery("end", commit.getTimepoint().getTime()))
 					);
 				} else {
 					boolQueryShouldClause.mustNot(existsQuery("end"));
@@ -111,21 +111,21 @@ public class VersionControlHelper {
 
 			case CHANGES_ON_THIS_BRANCH_ONLY:
 				// On this branch and started not ended
-				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint))
+				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()))
 						.mustNot(existsQuery("end"));
 				break;
 
 			case CHANGES_IN_THIS_COMMIT_ONLY:
 				// On this branch and started at commit date, not ended
-				boolQueryShouldClause.must(termQuery("start", timepoint))
+				boolQueryShouldClause.must(termQuery("start", timepoint.getTime()))
 						.mustNot(existsQuery("end"));
 				break;
 
 			case CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY:
 				// On this branch and started at commit date, not ended
 				boolQueryShouldClause.must(boolQuery()
-						.should(termQuery("start", timepoint))
-						.should(termQuery("end", timepoint)));
+						.should(termQuery("start", timepoint.getTime()))
+						.should(termQuery("end", timepoint.getTime())));
 
 				if (commit != null && commit.isRebase()) {
 
@@ -148,10 +148,10 @@ public class VersionControlHelper {
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
 						branchCriteria.should(boolQuery()
 								.must(termQuery("path", branchTimeRange.getPath()))
-								.must(rangeQuery("start").gt(branchTimeRange.getStart()))
+								.must(rangeQuery("start").gt(branchTimeRange.getStart().getTime()))
 								.must(boolQuery()
 										.should(boolQuery().mustNot(existsQuery("end")))
-										.should(rangeQuery("end").lte(branchTimeRange.getEnd()))
+										.should(rangeQuery("end").lte(branchTimeRange.getEnd().getTime()))
 								)
 						);
 					}
@@ -171,10 +171,10 @@ public class VersionControlHelper {
 			final Date base = branch.getBase();
 			branchCriteria.should(boolQuery()
 					.must(termQuery("path", parentBranch.getPath()))
-					.must(rangeQuery("start").lte(base))
+					.must(rangeQuery("start").lte(base.getTime()))
 					.must(boolQuery()
 							.should(boolQuery().mustNot(existsQuery("end")))
-							.should(rangeQuery("end").gt(base)))
+							.should(rangeQuery("end").gt(base.getTime())))
 					.mustNot(termsQuery("_id", versionsReplaced))
 			);
 			addParentCriteriaRecursively(branchCriteria, parentBranch, versionsReplaced);
@@ -187,7 +187,7 @@ public class VersionControlHelper {
 				.withQuery(
 						new BoolQueryBuilder()
 								.must(termQuery("path", commit.getBranch().getPath()))
-								.must(rangeQuery("start").lt(commit.getTimepoint()))
+								.must(rangeQuery("start").lt(commit.getTimepoint().getTime()))
 								.mustNot(existsQuery("end"))
 				)
 				.withFilter(
@@ -204,7 +204,7 @@ public class VersionControlHelper {
 			});
 		}
 		if (!toSave.isEmpty()) {
-			repository.save(toSave);
+			repository.saveAll(toSave);
 			logger.debug("Ended {} {} {}", toSave.size(), clazz.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
 			toSave.clear();
 		}
@@ -214,7 +214,7 @@ public class VersionControlHelper {
 				.withQuery(
 						new BoolQueryBuilder()
 								.must(getBranchCriteriaIncludingOpenCommit(commit))
-								.must(rangeQuery("start").lt(commit.getTimepoint()))
+								.must(rangeQuery("start").lt(commit.getTimepoint().getTime()))
 				)
 				.withFilter(
 						new BoolQueryBuilder()

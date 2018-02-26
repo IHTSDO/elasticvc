@@ -45,7 +45,7 @@ public class ComponentService {
 			final List<C> changedComponents = changedOrDeletedComponents.stream().filter(d -> !d.isDeleted()).collect(Collectors.toList());
 			if (!changedComponents.isEmpty()) {
 				versionControlHelper.setEntityMeta(changedComponents, commit);
-				repository.save(changedComponents);
+				repository.saveAll(changedComponents);
 			}
 		}
 		return components.stream().filter(c -> !c.isDeleted()).collect(Collectors.toSet());
