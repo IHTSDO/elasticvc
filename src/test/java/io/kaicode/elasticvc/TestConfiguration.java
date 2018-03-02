@@ -15,6 +15,7 @@ import pl.allegro.tech.embeddedelasticsearch.PopularProperties;
 import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 
 @SpringBootApplication
 public class TestConfiguration {
@@ -52,6 +53,7 @@ public class TestConfiguration {
 		try {
 			standaloneTestElasticsearchServer = EmbeddedElastic.builder()
 					.withElasticVersion(ELASTIC_SEARCH_VERSION)
+					.withStartTimeout(30, TimeUnit.SECONDS)
 					.withSetting(PopularProperties.CLUSTER_NAME, "integration-test-cluster")
 					.withSetting(PopularProperties.HTTP_PORT, 9935)
 					.build()
