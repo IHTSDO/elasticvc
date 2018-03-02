@@ -197,7 +197,7 @@ public class BranchService {
 		return elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")))
 				.withSort(new FieldSortBuilder("path"))
-				.withPageable(new PageRequest(0, 10000))
+				.withPageable(PageRequest.of(0, 10000))
 				.build(), Branch.class);
 	}
 
@@ -339,7 +339,7 @@ public class BranchService {
 							.must(termQuery("path", path))
 							.mustNot(existsQuery("end"))
 					)
-				.withPageable(new PageRequest(0, 1))
+				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class);
 
 		if (!branches.isEmpty()) {

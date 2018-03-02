@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.repository.ElasticsearchCrudRepository;
 import org.springframework.stereotype.Service;
 
@@ -21,10 +23,24 @@ public class ComponentService {
 	@Autowired
 	private VersionControlHelper versionControlHelper;
 
-	public static final PageRequest LARGE_PAGE = new PageRequest(0, 10000);
+	@Autowired
+	private ElasticsearchTemplate elasticsearchTemplate;
+
+	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10000);
 	public static final int CLAUSE_LIMIT = 800;
 
-	private final Logger logger = LoggerFactory.getLogger(getClass());
+	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
+
+	public static void initialiseIndexAndMappingForPersistentClasses(ElasticsearchTemplate elasticsearchTemplate, Class<?>... persistentClass) {
+		for (Class<?> aClass : persistentClass) {
+			ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
+			if (elasticsearchTemplate.indexExists(persistentEntity.getIndexName())) {
+				logger.info("Creating index {}", persistentEntity.getIndexName());
+				elasticsearchTemplate.createIndex(aClass);
+				elasticsearchTemplate.putMapping(aClass);
+			}
+		}
+	}
 
 	@SuppressWarnings("unchecked")
 	/**

@@ -7,6 +7,7 @@ import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -23,6 +24,9 @@ public class BranchServiceTest {
 
 	@Autowired
 	private BranchService branchService;
+
+	@Autowired
+	private ElasticsearchTemplate elasticsearchTemplate;
 
 	@Test
 	public void testCreateFindBranches() throws Exception {
@@ -100,7 +104,12 @@ public class BranchServiceTest {
 
 	@Test
 	public void testBranchState() {
+		elasticsearchTemplate.putMapping(Branch.class);
 		branchService.create("MAIN");
+
+		Map mapping = elasticsearchTemplate.getMapping(Branch.class);
+		System.out.println(mapping);
+
 		branchService.create("MAIN/A");
 		branchService.create("MAIN/A/A1");
 		branchService.create("MAIN/B");
