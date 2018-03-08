@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootApplication
 public class TestConfiguration {
 
-	private static final String ELASTIC_SEARCH_VERSION = "6.2.0";
+	private static final String ELASTIC_SEARCH_VERSION = "6.0.1";
 
 	private static EmbeddedElastic standaloneTestElasticsearchServer;
 

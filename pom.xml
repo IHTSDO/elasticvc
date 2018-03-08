@@ -15,7 +15,7 @@
 
 		<!--
 			Snomed International's Fork of Spring Data Elasticsearch 4.0.0-SNAPSHOT includes an up to date REST client
-			- uses Elasticsearch 6.2.0
+			- uses Elasticsearch 6.0.1
 			N.B. Remember to keep test version in sync in TestConfiguration.ELASTIC_SEARCH_VERSION
 		-->
 		<snomed-spring-data-elasticsearch.version>4.0.0-SNAPSHOT</snomed-spring-data-elasticsearch.version>
