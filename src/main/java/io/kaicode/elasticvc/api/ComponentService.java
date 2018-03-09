@@ -31,10 +31,13 @@ public class ComponentService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
-	public static void initialiseIndexAndMappingForPersistentClasses(ElasticsearchTemplate elasticsearchTemplate, Class<?>... persistentClass) {
+	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchTemplate elasticsearchTemplate, Class<?>... persistentClass) {
 		for (Class<?> aClass : persistentClass) {
 			ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
-			if (elasticsearchTemplate.indexExists(persistentEntity.getIndexName())) {
+			if (deleteExisting) {
+				elasticsearchTemplate.deleteIndex(persistentEntity.getIndexName());
+			}
+			if (!elasticsearchTemplate.indexExists(persistentEntity.getIndexName())) {
 				logger.info("Creating index {}", persistentEntity.getIndexName());
 				elasticsearchTemplate.createIndex(aClass);
 				elasticsearchTemplate.putMapping(aClass);

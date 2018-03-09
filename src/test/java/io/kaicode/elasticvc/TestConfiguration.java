@@ -38,6 +38,7 @@ public class TestConfiguration {
 	@Bean
 	public ComponentService componentService() {
 		ComponentService.initialiseIndexAndMappingForPersistentClasses(
+				true,
 				elasticsearchTemplate(),
 				Branch.class,
 				Concept.class
