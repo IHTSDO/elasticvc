@@ -40,13 +40,13 @@ public class ComponentService {
 		classes.add(Branch.class);
 		if (deleteExisting) {
 			logger.info("Deleting indices");
-			for (Class<?> aClass : persistentClass) {
+			for (Class<?> aClass : classes) {
 				ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
 				logger.info("Deleting index {}", persistentEntity.getIndexName());
 				elasticsearchTemplate.deleteIndex(persistentEntity.getIndexName());
 			}
 		}
-		for (Class<?> aClass : persistentClass) {
+		for (Class<?> aClass : classes) {
 			ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
 			if (!elasticsearchTemplate.indexExists(persistentEntity.getIndexName())) {
 				logger.info("Creating index {}", persistentEntity.getIndexName());
