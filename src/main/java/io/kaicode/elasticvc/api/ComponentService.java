@@ -1,8 +1,10 @@
 package io.kaicode.elasticvc.api;
 
+import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import net.jodah.typetools.TypeResolver;
+import org.elasticsearch.common.util.set.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,7 @@ import org.springframework.data.elasticsearch.repository.ElasticsearchCrudReposi
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,11 +35,19 @@ public class ComponentService {
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
 	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchTemplate elasticsearchTemplate, Class<?>... persistentClass) {
-		for (Class<?> aClass : persistentClass) {
-			ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
-			if (deleteExisting) {
+		logger.info("Initialising indices");
+		Set<Class<?>> classes = Sets.newHashSet(persistentClass);
+		classes.add(Branch.class);
+		if (deleteExisting) {
+			logger.info("Deleting indices");
+			for (Class<?> aClass : persistentClass) {
+				ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
+				logger.info("Deleting index {}", persistentEntity.getIndexName());
 				elasticsearchTemplate.deleteIndex(persistentEntity.getIndexName());
 			}
+		}
+		for (Class<?> aClass : persistentClass) {
+			ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
 			if (!elasticsearchTemplate.indexExists(persistentEntity.getIndexName())) {
 				logger.info("Creating index {}", persistentEntity.getIndexName());
 				elasticsearchTemplate.createIndex(aClass);
