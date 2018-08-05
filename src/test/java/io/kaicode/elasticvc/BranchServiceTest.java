@@ -132,6 +132,42 @@ public class BranchServiceTest {
 		assertBranchState("MAIN/A", DIVERGED);
 		assertBranchState("MAIN/A/A1", BEHIND);
 		assertBranchState("MAIN/B", BEHIND);
+
+		assertNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
+
+		try (Commit commit = branchService.openPromotionCommit("MAIN", "MAIN/A")) {
+			commit.markSuccessful();
+		}
+
+		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
+
+		assertBranchState("MAIN", UP_TO_DATE);
+		assertBranchState("MAIN/A", UP_TO_DATE);
+		assertBranchState("MAIN/A/A1", BEHIND);
+		assertBranchState("MAIN/B", BEHIND);
+
+		makeEmptyCommit("MAIN");
+
+		assertBranchState("MAIN", UP_TO_DATE);
+		assertBranchState("MAIN/A", BEHIND);
+		assertBranchState("MAIN/A/A1", BEHIND);
+		assertBranchState("MAIN/B", BEHIND);
+
+		try (Commit commit = branchService.openRebaseCommit("MAIN/A")) {
+			commit.markSuccessful();
+		}
+
+		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
+
+		assertBranchState("MAIN", UP_TO_DATE);
+		assertBranchState("MAIN/A", UP_TO_DATE);
+		assertBranchState("MAIN/A/A1", BEHIND);
+		assertBranchState("MAIN/B", BEHIND);
+
+		makeEmptyCommit("MAIN/A");
+
+		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
+
 	}
 
 	@Test

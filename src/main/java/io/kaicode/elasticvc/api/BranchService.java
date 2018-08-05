@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
@@ -281,6 +280,7 @@ public class BranchService {
 		newBranchTimespan.setHead(timepoint);
 		newBranchTimespan.addVersionsReplaced(oldBranchTimespan.getVersionsReplaced());
 		newBranchTimespan.addVersionsReplaced(commit.getEntityVersionsReplaced());
+		newBranchTimespan.setLastPromotion(oldBranchTimespan.getLastPromotion());
 
 		final List<Branch> newBranchVersionsToSave = new ArrayList<>();
 		newBranchVersionsToSave.add(oldBranchTimespan);
