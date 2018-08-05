@@ -21,6 +21,9 @@ public class Branch extends Entity {
 	private Date head;
 
 	@Field(type = FieldType.Date)
+	private Date creation;
+
+	@Field(type = FieldType.Date)
 	private Date lastPromotion;
 
 	@Field(type = FieldType.Boolean)
@@ -108,6 +111,14 @@ public class Branch extends Entity {
 
 	public Date getHead() {
 		return head;
+	}
+
+	public Date getCreation() {
+		return creation;
+	}
+
+	public void setCreation(Date creation) {
+		this.creation = creation;
 	}
 
 	public Date getLastPromotion() {

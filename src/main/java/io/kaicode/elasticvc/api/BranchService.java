@@ -80,6 +80,7 @@ public class BranchService {
 		branch.setHead(commitTimepoint);
 		branch.setStart(commitTimepoint);
 		branch.setMetadataInternal(metadata);
+		branch.setCreation(commitTimepoint);
 		logger.info("Creating branch {}", branch);
 		return branchRepository.save(branch).setState(Branch.BranchState.UP_TO_DATE);
 	}
@@ -280,6 +281,7 @@ public class BranchService {
 		newBranchTimespan.setHead(timepoint);
 		newBranchTimespan.addVersionsReplaced(oldBranchTimespan.getVersionsReplaced());
 		newBranchTimespan.addVersionsReplaced(commit.getEntityVersionsReplaced());
+		newBranchTimespan.setCreation(oldBranchTimespan.getCreation());
 		newBranchTimespan.setLastPromotion(oldBranchTimespan.getLastPromotion());
 
 		final List<Branch> newBranchVersionsToSave = new ArrayList<>();
@@ -305,6 +307,7 @@ public class BranchService {
 			newSourceBranch.setStart(timepoint);
 			newSourceBranch.setHead(timepoint);
 			newSourceBranch.setLastPromotion(timepoint);
+			newSourceBranch.setCreation(oldSourceBranch.getCreation());
 			newSourceBranch.setContainsContent(false);
 			newBranchVersionsToSave.add(newSourceBranch);
 			logger.debug("Updating branch base and clearing versionsReplaced {}", newSourceBranch);

@@ -11,6 +11,7 @@ import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,7 @@ public class BranchServiceTest {
 	private ElasticsearchTemplate elasticsearchTemplate;
 
 	@Test
-	public void testCreateFindBranches() throws Exception {
+	public void testCreateFindBranches() {
 		assertNull(branchService.findLatest("MAIN"));
 
 		final Branch branch = branchService.create("MAIN");
@@ -110,7 +111,7 @@ public class BranchServiceTest {
 		Map mapping = elasticsearchTemplate.getMapping(Branch.class);
 		System.out.println(mapping);
 
-		branchService.create("MAIN/A");
+		Date mainACreationDate = branchService.create("MAIN/A").getCreation();
 		branchService.create("MAIN/A/A1");
 		branchService.create("MAIN/B");
 
@@ -120,6 +121,7 @@ public class BranchServiceTest {
 		assertBranchState("MAIN/B", UP_TO_DATE);
 
 		makeEmptyCommit("MAIN/A");
+		assertEquals(mainACreationDate, branchService.findBranchOrThrow("MAIN/A").getCreation());
 
 		assertBranchState("MAIN", UP_TO_DATE);
 		assertBranchState("MAIN/A", FORWARD);
@@ -138,6 +140,7 @@ public class BranchServiceTest {
 		try (Commit commit = branchService.openPromotionCommit("MAIN", "MAIN/A")) {
 			commit.markSuccessful();
 		}
+		assertEquals(mainACreationDate, branchService.findBranchOrThrow("MAIN/A").getCreation());
 
 		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
 
@@ -156,6 +159,7 @@ public class BranchServiceTest {
 		try (Commit commit = branchService.openRebaseCommit("MAIN/A")) {
 			commit.markSuccessful();
 		}
+		assertEquals(mainACreationDate, branchService.findBranchOrThrow("MAIN/A").getCreation());
 
 		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
 
@@ -166,8 +170,8 @@ public class BranchServiceTest {
 
 		makeEmptyCommit("MAIN/A");
 
+		assertEquals(mainACreationDate, branchService.findBranchOrThrow("MAIN/A").getCreation());
 		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
-
 	}
 
 	@Test
