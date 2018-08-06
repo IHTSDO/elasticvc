@@ -67,6 +67,14 @@ public class VersionControlHelper {
 		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY, commit);
 	}
 
+	public QueryBuilder getBranchCriteriaUnpromotedChangesAndDeletions(Branch branch) {
+		return getBranchCriteria(branch, null, null, ContentSelection.UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH, null);
+	}
+
+	public QueryBuilder getBranchCriteriaUnpromotedChanges(Branch branch) {
+		return getBranchCriteria(branch, null, null, ContentSelection.UNPROMOTED_CHANGES_ON_THIS_BRANCH, null);
+	}
+
 	public BoolQueryBuilder getUpdatesOnBranchDuringRangeCriteria(String path, Date start, Date end) {
 		final Branch branch = getBranchOrThrow(path);
 		return boolQuery()
@@ -157,6 +165,22 @@ public class VersionControlHelper {
 					}
 				}
 
+				break;
+
+			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH: {
+					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
+					branchCriteria.must(boolQuery()
+							.should(rangeQuery("start").gte(startPoint))
+							.should(rangeQuery("end").gte(startPoint)));
+				}
+				break;
+
+			case UNPROMOTED_CHANGES_ON_THIS_BRANCH: {
+					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
+					branchCriteria
+							.must(rangeQuery("start").gte(startPoint))
+							.mustNot(existsQuery("end"));
+				}
 				break;
 		}
 		return branchCriteria;
@@ -258,7 +282,9 @@ public class VersionControlHelper {
 		STANDARD_SELECTION,
 		CHANGES_ON_THIS_BRANCH_ONLY,
 		CHANGES_IN_THIS_COMMIT_ONLY,
-		CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY
+		CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY,
+		UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH,
+		UNPROMOTED_CHANGES_ON_THIS_BRANCH;
 	}
 
 	private static final class BranchTimeRange {
