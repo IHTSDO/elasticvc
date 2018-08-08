@@ -169,7 +169,8 @@ public class VersionControlHelper {
 
 			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH: {
 					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
-					branchCriteria.must(boolQuery()
+				branchCriteria.must(termQuery("path", branch.getPath()));
+				branchCriteria.must(boolQuery()
 							.should(rangeQuery("start").gte(startPoint))
 							.should(rangeQuery("end").gte(startPoint)));
 				}
@@ -177,7 +178,8 @@ public class VersionControlHelper {
 
 			case UNPROMOTED_CHANGES_ON_THIS_BRANCH: {
 					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
-					branchCriteria
+				branchCriteria.must(termQuery("path", branch.getPath()));
+				branchCriteria
 							.must(rangeQuery("start").gte(startPoint))
 							.mustNot(existsQuery("end"));
 				}
