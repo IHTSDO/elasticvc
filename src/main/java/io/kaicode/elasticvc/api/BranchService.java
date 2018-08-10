@@ -35,6 +35,8 @@ public class BranchService {
 
 	private final List<CommitListener> commitListeners;
 
+	private final Integer branchLockSyncObject = 0;
+
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	public BranchService() {
@@ -216,10 +218,16 @@ public class BranchService {
 		return openCommit(path, Commit.CommitType.CONTENT);
 	}
 
-	private Commit openCommit(String path, Commit.CommitType commitType) {
-		Branch branch = findBranchOrThrow(path);
-		branch = lockBranch(branch);
-		return new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+	private Commit openCommit(String branchPath, Commit.CommitType commitType) {
+		synchronized (branchLockSyncObject) {
+			Branch branch = findBranchOrThrow(branchPath);
+			if (branch.isLocked()) {
+				throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
+			}
+			branch.setLocked(true);
+			branch = branchRepository.save(branch);
+			return new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+		}
 	}
 
 	public Branch updateMetadata(String path, Map<String, String> metadata) {
@@ -244,16 +252,6 @@ public class BranchService {
 		final Commit commit = openCommit(path, Commit.CommitType.PROMOTION);
 		commit.setSourceBranchPath(sourcePath);
 		return commit;
-	}
-
-	// TODO Make this work in a clustered environment
-	private synchronized Branch lockBranch(Branch branch) {
-		if (branch.isLocked()) {
-			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
-		}
-
-		branch.setLocked(true);
-		return branchRepository.save(branch);
 	}
 
 	private synchronized void completeCommit(Commit commit) {
