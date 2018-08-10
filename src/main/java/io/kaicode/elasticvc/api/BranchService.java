@@ -254,7 +254,7 @@ public class BranchService {
 		return commit;
 	}
 
-	private synchronized void completeCommit(Commit commit) {
+	private void completeCommit(Commit commit) {
 		try {
 			for (CommitListener commitListener : commitListeners) {
 				commitListener.preCommitCompletion(commit);
@@ -316,7 +316,7 @@ public class BranchService {
 		branchRepository.saveAll(newBranchVersionsToSave);
 	}
 
-	private synchronized void rollbackCommit(Commit commit) {
+	private void rollbackCommit(Commit commit) {
 		// On all indexes touched: delete documents with the path and timepoint of the commit
 		// then remove the write lock from the branch.
 		DeleteQuery deleteQuery = new DeleteQuery();
