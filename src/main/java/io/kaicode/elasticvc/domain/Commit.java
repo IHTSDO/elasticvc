@@ -1,5 +1,7 @@
 package io.kaicode.elasticvc.domain;
 
+import org.elasticsearch.common.util.iterable.Iterables;
+
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -81,6 +83,12 @@ public class Commit implements AutoCloseable {
 
 	public Set<String> getEntityVersionsReplaced() {
 		return entityVersionsReplaced;
+	}
+
+	public Set<String> getEntityVersionsReplacedIncludingFromBranch() {
+		Set<String> versions = new HashSet<>(entityVersionsReplaced);
+		versions.addAll(branch.getVersionsReplaced());
+		return versions;
 	}
 
 	public Set<String> getEntityVersionsDeleted() {

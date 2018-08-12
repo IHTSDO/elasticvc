@@ -47,7 +47,7 @@ public class VersionControlHelper {
 	}
 
 	public QueryBuilder getBranchCriteriaIncludingOpenCommit(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), ContentSelection.STANDARD_SELECTION, commit);
 	}
 
 	public QueryBuilder getChangesOnBranchCriteria(String path) {
@@ -60,11 +60,11 @@ public class VersionControlHelper {
 	}
 
 	public QueryBuilder getBranchCriteriaChangesWithinOpenCommitOnly(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), ContentSelection.CHANGES_IN_THIS_COMMIT_ONLY, commit);
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), ContentSelection.CHANGES_IN_THIS_COMMIT_ONLY, commit);
 	}
 
 	public QueryBuilder getBranchCriteriaChangesAndDeletionsWithinOpenCommitOnly(Commit commit) {
-		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplaced(), CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY, commit);
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY, commit);
 	}
 
 	public QueryBuilder getBranchCriteriaUnpromotedChangesAndDeletions(Branch branch) {
