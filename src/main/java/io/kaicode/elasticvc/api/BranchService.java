@@ -215,19 +215,30 @@ public class BranchService {
 	}
 
 	public Commit openCommit(String path) {
-		return openCommit(path, Commit.CommitType.CONTENT);
+		return openCommit(path, null, Commit.CommitType.CONTENT);
 	}
 
-	private Commit openCommit(String branchPath, Commit.CommitType commitType) {
+	private Commit openCommit(String branchPath, String mergeSourceBranchPath, Commit.CommitType commitType) {
 		synchronized (branchLockSyncObject) {
-			Branch branch = findBranchOrThrow(branchPath);
-			if (branch.isLocked()) {
-				throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
+			if (commitType == Commit.CommitType.PROMOTION) {
+				// Lock source branch as well as target
+				lockBranch(mergeSourceBranchPath);
 			}
-			branch.setLocked(true);
-			branch = branchRepository.save(branch);
-			return new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+			Branch branch = lockBranch(branchPath);
+			Commit commit = new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+			logger.info("Open commit on {} at {}", branchPath, commit.getTimepoint().getTime());
+			return commit;
 		}
+	}
+
+	private Branch lockBranch(String branchPath) {
+		Branch branch = findBranchOrThrow(branchPath);
+		if (branch.isLocked()) {
+			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
+		}
+		branch.setLocked(true);
+		branch = branchRepository.save(branch);
+		return branch;
 	}
 
 	public Branch updateMetadata(String path, Map<String, String> metadata) {
@@ -237,7 +248,7 @@ public class BranchService {
 	}
 
 	public Commit openRebaseCommit(String path) {
-		final Commit commit = openCommit(path, Commit.CommitType.REBASE);
+		final Commit commit = openCommit(path, null, Commit.CommitType.REBASE);
 		final Branch branch = commit.getBranch();
 		if (!PathUtil.isRoot(path)) {
 			final String parentPath = PathUtil.getParentPath(path);
@@ -249,7 +260,7 @@ public class BranchService {
 	}
 
 	public Commit openPromotionCommit(String path, String sourcePath) {
-		final Commit commit = openCommit(path, Commit.CommitType.PROMOTION);
+		final Commit commit = openCommit(path, sourcePath, Commit.CommitType.PROMOTION);
 		commit.setSourceBranchPath(sourcePath);
 		return commit;
 	}
@@ -297,6 +308,7 @@ public class BranchService {
 			// Clear versions replaced on source
 			final Branch oldSourceBranch = findAtTimepointOrThrow(sourceBranchPath, timepoint);
 			oldSourceBranch.setEnd(timepoint);
+			oldSourceBranch.setLocked(false);
 			newBranchTimespan.addVersionsReplaced(oldSourceBranch.getVersionsReplaced());
 			newBranchVersionsToSave.add(oldSourceBranch);
 
@@ -314,6 +326,7 @@ public class BranchService {
 		logger.debug("Ending branch timespan {}", oldBranchTimespan);
 		logger.debug("Starting branch timespan {}", newBranchTimespan);
 		branchRepository.saveAll(newBranchVersionsToSave);
+		logger.info("Completed commit on {} at {}", commit.getBranch().getPath(), commit.getTimepoint().getTime());
 	}
 
 	private void rollbackCommit(Commit commit) {
