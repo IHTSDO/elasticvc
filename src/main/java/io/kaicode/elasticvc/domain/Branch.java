@@ -197,7 +197,6 @@ public class Branch extends Entity {
 				", head=" + getMillis(head) +
 				", start=" + getMillis(getStart()) +
 				", end=" + getMillis(getEnd()) +
-				", versionsReplaced=" + versionsReplaced +
 				'}';
 	}
 
