@@ -8,6 +8,7 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
@@ -25,6 +26,7 @@ import static org.elasticsearch.index.query.QueryBuilders.*;
 @Service
 public class VersionControlHelper {
 
+	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
 	@Autowired
 	private BranchService branchService;
 
@@ -220,6 +222,7 @@ public class VersionControlHelper {
 						new BoolQueryBuilder()
 								.must(termsQuery(idField, ids))
 				)
+				.withPageable(LARGE_PAGE)
 				.build();
 
 		List<T> toSave = new ArrayList<>();
@@ -246,6 +249,8 @@ public class VersionControlHelper {
 						new BoolQueryBuilder()
 								.must(termsQuery(idField, ids))
 				)
+				.withFields("internalId")
+				.withPageable(LARGE_PAGE)
 				.build();
 
 		Set<String> versionsReplaced = new HashSet<>();
