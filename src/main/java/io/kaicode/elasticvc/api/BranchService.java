@@ -288,6 +288,7 @@ public class BranchService {
 		newBranchTimespan.setBase(oldBranchTimespan.getBase());
 		newBranchTimespan.setStart(timepoint);
 		newBranchTimespan.setHead(timepoint);
+		newBranchTimespan.setMetadata(oldBranchTimespan.getMetadata());
 		newBranchTimespan.addVersionsReplaced(oldBranchTimespan.getVersionsReplaced());
 		newBranchTimespan.addVersionsReplaced(commit.getEntityVersionsReplaced());
 		newBranchTimespan.setCreation(oldBranchTimespan.getCreation());
@@ -316,6 +317,7 @@ public class BranchService {
 			newSourceBranch.setBase(timepoint);
 			newSourceBranch.setStart(timepoint);
 			newSourceBranch.setHead(timepoint);
+			newSourceBranch.setMetadata(oldSourceBranch.getMetadata());
 			newSourceBranch.setLastPromotion(timepoint);
 			newSourceBranch.setCreation(oldSourceBranch.getCreation());
 			newSourceBranch.setContainsContent(false);

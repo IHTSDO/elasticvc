@@ -106,7 +106,9 @@ public class BranchServiceTest {
 	@Test
 	public void testBranchState() {
 		elasticsearchTemplate.putMapping(Branch.class);
-		branchService.create("MAIN");
+		Map<String, String> meta = new HashMap<>();
+		meta.put("test", "123");
+		branchService.create("MAIN", meta);
 
 		Map mapping = elasticsearchTemplate.getMapping(Branch.class);
 		System.out.println(mapping);
@@ -172,6 +174,11 @@ public class BranchServiceTest {
 
 		assertEquals(mainACreationDate, branchService.findBranchOrThrow("MAIN/A").getCreation());
 		assertNotNull(branchService.findBranchOrThrow("MAIN/A").getLastPromotion());
+
+		Branch main = branchService.findLatest("MAIN");
+		assertNotNull(main.getMetadata());
+		assertEquals(1, main.getMetadata().size());
+		assertEquals("123", main.getMetadata().get("test"));
 	}
 
 	@Test
