@@ -332,6 +332,7 @@ public class BranchService {
 	}
 
 	private void rollbackCommit(Commit commit) {
+		logger.info("Rolling back commit on {} started at {}", commit.getBranch().getPath(), commit.getTimepoint().getTime());
 		// On all indexes touched: delete documents with the path and timepoint of the commit
 		// then remove the write lock from the branch.
 		DeleteQuery deleteQuery = new DeleteQuery();
