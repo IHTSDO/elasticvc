@@ -1,11 +1,11 @@
 package io.kaicode.elasticvc.example.service;
 
+import io.kaicode.elasticvc.api.BranchCriteria;
 import io.kaicode.elasticvc.api.BranchService;
 import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.api.VersionControlHelper;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
@@ -54,13 +54,13 @@ public class ConceptService extends ComponentService {
 		// The VersionControlHelper is used to give us a view of content on a branch
 		// This view includes content on parent branches up to the point of last rebase
 		// it excludes content on parent branches which has been deleted on this branch
-		QueryBuilder branchCriteria = versionControlHelper.getBranchCriteria(branchPath);
+		BranchCriteria branchCriteria = versionControlHelper.getBranchCriteria(branchPath);
 
 		// Create a query
 		NativeSearchQuery nativeSearchQuery = new NativeSearchQueryBuilder()
 				.withQuery(boolQuery()
 						// Always include the branch criteria
-						.must(branchCriteria)
+						.must(branchCriteria.getEntityBranchCriteria(Concept.class))
 						// Also add any other required clauses
 						.must(termQuery(Concept.FIELD_ID, id))
 				).build();

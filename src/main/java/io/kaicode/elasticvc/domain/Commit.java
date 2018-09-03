@@ -1,11 +1,8 @@
 package io.kaicode.elasticvc.domain;
 
-import org.elasticsearch.common.util.iterable.Iterables;
+import io.kaicode.elasticvc.api.MapUtil;
 
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class Commit implements AutoCloseable {
@@ -15,7 +12,7 @@ public class Commit implements AutoCloseable {
 	private final Date timepoint;
 	private Date rebasePreviousBase;
 
-	private final Set<String> entityVersionsReplaced;
+	private final Map<String, Set<String>> entityVersionsReplaced;
 	private final Set<String> entityVersionsDeleted;
 	private final Set<Class> domainEntityClasses;
 
@@ -28,7 +25,7 @@ public class Commit implements AutoCloseable {
 	public Commit(Branch branch, CommitType commitType, Consumer<Commit> onSuccess, Consumer<Commit> onFailure) {
 		this.branch = branch;
 		this.timepoint = new Date();
-		entityVersionsReplaced = Collections.synchronizedSet(new HashSet<>());
+		entityVersionsReplaced = new HashMap<>();
 		entityVersionsDeleted = Collections.synchronizedSet(new HashSet<>());
 		domainEntityClasses = Collections.synchronizedSet(new HashSet<>());
 		this.commitType = commitType;
@@ -65,30 +62,21 @@ public class Commit implements AutoCloseable {
 		return commitType;
 	}
 
-	public void addVersionsReplaced(Set<String> internalIds) {
-		entityVersionsReplaced.addAll(internalIds);
+	public void addVersionsReplaced(Set<String> internalIds, Class<? extends DomainEntity> entityClass) {
+		entityVersionsReplaced.computeIfAbsent(entityClass.getSimpleName(), (c) -> new HashSet<>()).addAll(internalIds);
 	}
 
 	public void addVersionsDeleted(Set<String> internalIds) {
 		entityVersionsDeleted.addAll(internalIds);
 	}
 
-	public void addVersionReplaced(String internalId) {
-		entityVersionsReplaced.add(internalId);
-	}
-
-	public void addVersionDeleted(String internalId) {
-		entityVersionsDeleted.add(internalId);
-	}
-
-	public Set<String> getEntityVersionsReplaced() {
+	public Map<String, Set<String>> getEntityVersionsReplaced() {
 		return entityVersionsReplaced;
 	}
 
-	public Set<String> getEntityVersionsReplacedIncludingFromBranch() {
-		Set<String> versions = new HashSet<>(entityVersionsReplaced);
-		versions.addAll(branch.getVersionsReplaced());
-		return versions;
+	public Map<String, Set<String>> getEntityVersionsReplacedIncludingFromBranch() {
+		Map<String, Set<String>> versions = MapUtil.addAll(entityVersionsReplaced, new HashMap<>());
+		return MapUtil.addAll(branch.getVersionsReplaced(), versions);
 	}
 
 	public Set<String> getEntityVersionsDeleted() {

@@ -5,10 +5,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Document(type = "branch", indexName = "branch", shards = 8)
@@ -33,22 +30,22 @@ public class Branch extends Entity {
 	private boolean containsContent;
 
 	// The internal ids of entities visible on ancestor branches which have been replaced or deleted on this branch
-	private Set<String> versionsReplaced;
+	private Map<String, Set<String>> versionsReplaced;
 
 	@Field(type = FieldType.Object)
 	private Map<String, String> metadataInternal;
 
 	private BranchState state;
 
-	public enum BranchState {
-		UP_TO_DATE, FORWARD, BEHIND, DIVERGED
-	}
 
+	public enum BranchState {
+		UP_TO_DATE, FORWARD, BEHIND, DIVERGED;
+
+	}
 	public Branch() {
 		head = new Date();
-		versionsReplaced = new HashSet<>();
+		versionsReplaced = new HashMap<>();
 	}
-
 	public Branch(String path) {
 		this();
 		setPath(path);
@@ -77,9 +74,23 @@ public class Branch extends Entity {
 		return endIndex > 0 && getPath().equals(childPath.substring(0, endIndex));
 	}
 
-	public void addVersionsReplaced(Set<String> internalIds) {
+	public void addVersionsReplaced(Map<String, Set<String>> versionsReplacedToAdd) {
+		for (String key : versionsReplacedToAdd.keySet()) {
+			versionsReplaced.computeIfAbsent(key, (k) -> new HashSet<>()).addAll(versionsReplacedToAdd.get(key));
+		}
+	}
+
+	public void addVersionsReplaced(DomainEntity entity, Set<String> internalIds) {
 		if (notMAIN()) {
-			versionsReplaced.addAll(internalIds);
+			versionsReplaced.computeIfAbsent(entity.getClass().getSimpleName(), (clazz) -> new HashSet<>()).addAll(internalIds);
+		}
+	}
+
+	public Set<String> getVersionsReplaced(Class<? extends DomainEntity> entityClass) {
+		if (notMAIN()) {
+			return versionsReplaced.getOrDefault(entityClass.getSimpleName(), Collections.emptySet());
+		} else {
+			return Collections.emptySet();
 		}
 	}
 
@@ -145,11 +156,19 @@ public class Branch extends Entity {
 		this.containsContent = containsContent;
 	}
 
-	public Set<String> getVersionsReplaced() {
+	public Map<String, Set<String>> getVersionsReplaced() {
 		return versionsReplaced;
 	}
 
-	public void setVersionsReplaced(Set<String> versionsReplaced) {
+	public Map<String, Integer> getVersionsReplacedCounts() {
+		Map<String, Integer> counts = new HashMap<>();
+		for (String key : versionsReplaced.keySet()) {
+			counts.put(key, versionsReplaced.get(key).size());
+		}
+		return counts;
+	}
+
+	public void setVersionsReplaced(Map<String, Set<String>> versionsReplaced) {
 		this.versionsReplaced = versionsReplaced;
 	}
 

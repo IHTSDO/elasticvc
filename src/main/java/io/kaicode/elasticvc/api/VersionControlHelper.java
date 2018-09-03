@@ -2,9 +2,9 @@ package io.kaicode.elasticvc.api;
 
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
+import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.domain.Entity;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,45 +35,45 @@ public class VersionControlHelper {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	public QueryBuilder getBranchCriteria(String path) {
+	public BranchCriteria getBranchCriteria(String path) {
 		return getBranchCriteria(getBranchOrThrow(path));
 	}
 
-	public QueryBuilder getBranchCriteria(Branch branch) {
+	public BranchCriteria getBranchCriteria(Branch branch) {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
-	public QueryBuilder getBranchCriteriaBeforeOpenCommit(Commit commit) {
+	public BranchCriteria getBranchCriteriaBeforeOpenCommit(Commit commit) {
 		Branch branch = commit.getBranch();
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
 	}
 
-	public QueryBuilder getBranchCriteriaIncludingOpenCommit(Commit commit) {
+	public BranchCriteria getBranchCriteriaIncludingOpenCommit(Commit commit) {
 		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), ContentSelection.STANDARD_SELECTION, commit);
 	}
 
-	public QueryBuilder getChangesOnBranchCriteria(String path) {
+	public BranchCriteria getChangesOnBranchCriteria(String path) {
 		final Branch branch = getBranchOrThrow(path);
 		return getChangesOnBranchCriteria(branch);
 	}
 
-	public QueryBuilder getChangesOnBranchCriteria(Branch branch) {
+	public BranchCriteria getChangesOnBranchCriteria(Branch branch) {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY, null);
 	}
 
-	public QueryBuilder getBranchCriteriaChangesWithinOpenCommitOnly(Commit commit) {
+	public BranchCriteria getBranchCriteriaChangesWithinOpenCommitOnly(Commit commit) {
 		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), ContentSelection.CHANGES_IN_THIS_COMMIT_ONLY, commit);
 	}
 
-	public QueryBuilder getBranchCriteriaChangesAndDeletionsWithinOpenCommitOnly(Commit commit) {
+	public BranchCriteria getBranchCriteriaChangesAndDeletionsWithinOpenCommitOnly(Commit commit) {
 		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY, commit);
 	}
 
-	public QueryBuilder getBranchCriteriaUnpromotedChangesAndDeletions(Branch branch) {
+	public BranchCriteria getBranchCriteriaUnpromotedChangesAndDeletions(Branch branch) {
 		return getBranchCriteria(branch, null, null, ContentSelection.UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH, null);
 	}
 
-	public QueryBuilder getBranchCriteriaUnpromotedChanges(Branch branch) {
+	public BranchCriteria getBranchCriteriaUnpromotedChanges(Branch branch) {
 		return getBranchCriteria(branch, null, null, ContentSelection.UNPROMOTED_CHANGES_ON_THIS_BRANCH, null);
 	}
 
@@ -95,11 +95,12 @@ public class VersionControlHelper {
 		return branch;
 	}
 
-	private BoolQueryBuilder getBranchCriteria(Branch branch, Date timepoint, Set<String> versionsReplaced, ContentSelection contentSelection, Commit commit) {
+	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit) {
 		final BoolQueryBuilder boolQueryShouldClause = boolQuery();
 		final BoolQueryBuilder branchCriteria =
 				boolQuery().should(boolQueryShouldClause.must(termQuery("path", branch.getPath())));
 
+		Map<String, Set<String>> allEntityVersionsReplaced = null;
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
 				// On this branch and started not ended
@@ -116,7 +117,7 @@ public class VersionControlHelper {
 					boolQueryShouldClause.mustNot(existsQuery("end"));
 				}
 				// Or any parent branch within time constraints
-				addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
 				break;
 
 			case CHANGES_ON_THIS_BRANCH_ONLY:
@@ -187,15 +188,15 @@ public class VersionControlHelper {
 				}
 				break;
 		}
-		return branchCriteria;
+		return new BranchCriteria(branchCriteria, allEntityVersionsReplaced);
 	}
 
-	private void addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Set<String> versionsReplaced) {
+	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced) {
 		String parentPath = PathUtil.getParentPath(branch.getPath());
 		if (parentPath != null) {
 			final Branch parentBranch = branchService.findAtTimepointOrThrow(parentPath, branch.getBase());
-			versionsReplaced = new HashSet<>(versionsReplaced);
-			versionsReplaced.addAll(parentBranch.getVersionsReplaced());
+			versionsReplaced = MapUtil.addAll(versionsReplaced, new HashMap<>());
+			MapUtil.addAll(parentBranch.getVersionsReplaced(), versionsReplaced);
 			final Date base = branch.getBase();
 			branchCriteria.should(boolQuery()
 					.must(termQuery("path", parentBranch.getPath()))
@@ -203,13 +204,13 @@ public class VersionControlHelper {
 					.must(boolQuery()
 							.should(boolQuery().mustNot(existsQuery("end")))
 							.should(rangeQuery("end").gt(base.getTime())))
-					.mustNot(termsQuery("_id", versionsReplaced))
 			);
-			addParentCriteriaRecursively(branchCriteria, parentBranch, versionsReplaced);
+			return addParentCriteriaRecursively(branchCriteria, parentBranch, versionsReplaced);
 		}
+		return versionsReplaced;
 	}
 
-	<T extends Entity> void endOldVersions(Commit commit, String idField, Class<T> clazz, Collection<? extends Object> ids, ElasticsearchCrudRepository repository) {
+	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchCrudRepository repository) {
 		// End versions of the entity on this path by setting end date
 		final NativeSearchQuery query = new NativeSearchQueryBuilder()
 				.withQuery(
@@ -226,7 +227,7 @@ public class VersionControlHelper {
 				.build();
 
 		List<T> toSave = new ArrayList<>();
-		try (final CloseableIterator<T> localVersionsToEnd = elasticsearchTemplate.stream(query, clazz)) {
+		try (final CloseableIterator<T> localVersionsToEnd = elasticsearchTemplate.stream(query, entityClass)) {
 			localVersionsToEnd.forEachRemaining(version -> {
 				version.setEnd(commit.getTimepoint());
 				toSave.add(version);
@@ -234,7 +235,7 @@ public class VersionControlHelper {
 		}
 		if (!toSave.isEmpty()) {
 			repository.saveAll(toSave);
-			logger.debug("Ended {} {} {}", toSave.size(), clazz.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
+			logger.debug("Ended {} {} {}", toSave.size(), entityClass.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
 			toSave.clear();
 		}
 
@@ -242,7 +243,7 @@ public class VersionControlHelper {
 		final NativeSearchQuery query2 = new NativeSearchQueryBuilder()
 				.withQuery(
 						new BoolQueryBuilder()
-								.must(getBranchCriteriaIncludingOpenCommit(commit))
+								.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
 								.must(rangeQuery("start").lt(commit.getTimepoint().getTime()))
 				)
 				.withFilter(
@@ -254,14 +255,14 @@ public class VersionControlHelper {
 				.build();
 
 		Set<String> versionsReplaced = new HashSet<>();
-		try (final CloseableIterator<T> replacedVersions = elasticsearchTemplate.stream(query2, clazz)) {
+		try (final CloseableIterator<T> replacedVersions = elasticsearchTemplate.stream(query2, entityClass)) {
 			replacedVersions.forEachRemaining(version -> {
 				versionsReplaced.add(version.getInternalId());
 			});
 		}
-		commit.addVersionsReplaced(versionsReplaced);
+		commit.addVersionsReplaced(versionsReplaced, entityClass);
 
-		logger.debug("Replaced {} {} {}", versionsReplaced.size(), clazz.getSimpleName(), versionsReplaced);
+		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
 	}
 
 	void setEntityMeta(Entity entity, Commit commit) {
