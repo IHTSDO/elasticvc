@@ -1,14 +1,20 @@
 package io.kaicode.elasticvc;
 
 import io.kaicode.elasticvc.api.BranchService;
+import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
 import io.kaicode.elasticvc.example.service.ConceptService;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import java.util.Collections;
+
+import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = TestConfiguration.class)
@@ -26,18 +32,76 @@ public class ConceptExampleTest {
 	}
 
 	@Test
-	public void testCreateFind() {
-		branchService.create("MAIN");
+	public void testCreateFindUpdateOnMainBranch() {
+		String branch = "MAIN";
+		branchService.create(branch);
 
-		Assert.assertNull("Domain entity is not created yet.", conceptService.findConcept("1", "MAIN"));
+		Assert.assertNull("Domain entity is not created yet.", conceptService.findConcept("1", branch));
 
 		// Create entity
 		Concept conceptBeforeSave = new Concept("1", "Concept 1");
-		conceptService.createConcept(conceptBeforeSave, "MAIN");
+		conceptService.createUpdateConcept(conceptBeforeSave, branch);
 
-		Concept conceptFromRepository = conceptService.findConcept("1", "MAIN");
+		Concept conceptFromRepository = conceptService.findConcept("1", branch);
 		Assert.assertNotNull(conceptFromRepository);
-		Assert.assertEquals("Concept 1", conceptFromRepository.getTerm());
+		assertEquals("Concept 1", conceptFromRepository.getTerm());
+
+		assertEquals("There should be no versions replaced on MAIN", Collections.emptySet(), branchService.findLatest(branch).getVersionsReplaced().get("Concept"));
+
+		conceptFromRepository.setTerm("Updated");
+		conceptService.createUpdateConcept(conceptFromRepository, branch);
+
+		assertEquals("There should be no versions replaced on MAIN", Collections.emptySet(), branchService.findLatest(branch).getVersionsReplaced().get("Concept"));
+	}
+
+	@Test
+	public void testCreateFindUpdateOnChildOfMainBranch() {
+		String branch = "MAIN/A";
+		branchService.create("MAIN");
+		branchService.create(branch);
+
+		Assert.assertNull("Domain entity is not created yet.", conceptService.findConcept("1", branch));
+
+		// Create entity
+		Concept conceptBeforeSave = new Concept("1", "Concept 1");
+		conceptService.createUpdateConcept(conceptBeforeSave, branch);
+
+		Concept conceptFromRepository = conceptService.findConcept("1", branch);
+		Assert.assertNotNull(conceptFromRepository);
+		assertEquals("Concept 1", conceptFromRepository.getTerm());
+
+		assertEquals("There should be no versions replaced on MAIN/A", Collections.emptySet(), branchService.findLatest(branch).getVersionsReplaced().get("Concept"));
+
+		conceptFromRepository.setTerm("Updated");
+		conceptService.createUpdateConcept(conceptFromRepository, branch);
+
+		assertEquals("There should be no versions replaced on MAIN/A because the concept does not exist on the parent branch.",
+				Collections.emptySet(), branchService.findLatest(branch).getVersionsReplaced().get("Concept"));
+
+
+		// Create concept 2 on MAIN
+		Concept concept2 = new Concept("2", "Concept 2");
+		conceptService.createUpdateConcept(concept2, "MAIN");
+
+		// Rebase MAIN/A to make concept 2 visible
+		try (Commit rebaseCommit = branchService.openRebaseCommit(branch)) {
+			rebaseCommit.markSuccessful();
+		}
+		assertEquals("Concept 2", conceptService.findConcept("2", branch).getTerm());
+
+		// Update concept 2 on MAIN/A
+		concept2.setTerm("Something new");
+		conceptService.createUpdateConcept(concept2, branch);
+
+		assertEquals("Branch MAIN/A should now record 1 version replaced because concept 2 exists on the parent branch." +
+						"This allows the version control system to hide the version on MAIN when finding domain entities.",
+				1, branchService.findLatest(branch).getVersionsReplaced().get("Concept").size());
+	}
+
+	@After
+	public void tearDown() {
+		branchService.deleteAll();
+		conceptService.deleteAll();
 	}
 
 }

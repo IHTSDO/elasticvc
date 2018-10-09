@@ -12,7 +12,17 @@ public class Commit implements AutoCloseable {
 	private final Date timepoint;
 	private Date rebasePreviousBase;
 
+	/**
+	 * Map of classes and internal ids of the entities visible on ancestor branches which have been replaced
+	 * or deleted on this branch during this commit.
+	 */
 	private final Map<String, Set<String>> entityVersionsReplaced;
+
+	/**
+	 * Transient set of internal ids of the entities which have been replaced or deleted during this commit,
+	 * regardless of if they are visible on the parent branch.
+	 * This set is just to help with processing deletions during a commit.
+	 */
 	private final Set<String> entityVersionsDeleted;
 	private final Set<Class> domainEntityClasses;
 

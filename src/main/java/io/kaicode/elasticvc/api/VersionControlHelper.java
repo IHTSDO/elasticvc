@@ -245,6 +245,7 @@ public class VersionControlHelper {
 						new BoolQueryBuilder()
 								.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
 								.must(rangeQuery("start").lt(commit.getTimepoint().getTime()))
+								.mustNot(termQuery("path", commit.getBranch().getPath()))
 				)
 				.withFilter(
 						new BoolQueryBuilder()

@@ -29,7 +29,9 @@ public class Branch extends Entity {
 	@Field(type = FieldType.Boolean)
 	private boolean containsContent;
 
-	// The internal ids of entities visible on ancestor branches which have been replaced or deleted on this branch
+	/**
+	 * Map of classes and internal ids of entities visible on ancestor branches which have been replaced or deleted on this branch
+	 */
 	private Map<String, Set<String>> versionsReplaced;
 
 	@Field(type = FieldType.Object)

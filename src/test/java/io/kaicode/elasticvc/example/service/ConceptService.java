@@ -37,7 +37,7 @@ public class ConceptService extends ComponentService {
 	@Autowired
 	private ConceptRepository conceptRepository;
 
-	public void createConcept(Concept concept, String branch) {
+	public void createUpdateConcept(Concept concept, String branch) {
 		try (Commit commit = branchService.openCommit(branch)) {
 			// Mark new entity as changed so that it's persisted
 			concept.markChanged();
@@ -66,5 +66,9 @@ public class ConceptService extends ComponentService {
 				).build();
 		List<Concept> concepts = elasticsearchTemplate.queryForList(nativeSearchQuery, Concept.class);
 		return !concepts.isEmpty() ? concepts.get(0) : null;
+	}
+
+	public void deleteAll() {
+		conceptRepository.deleteAll();
 	}
 }
