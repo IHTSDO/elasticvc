@@ -6,6 +6,8 @@ import io.kaicode.elasticvc.repositories.BranchRepository;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
+import org.elasticsearch.search.sort.SortBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,6 +178,19 @@ public class BranchService {
 			}
 		}
 		return branch;
+	}
+
+	public Branch findFirstVersionOrThrow(String path) {
+		List<Branch> branchVersions = elasticsearchTemplate.queryForList(
+				new NativeSearchQueryBuilder()
+						.withQuery(termQuery("path", path))
+						.withSort(SortBuilders.fieldSort("start"))
+						.withPageable(PageRequest.of(0, 1))
+						.build(), Branch.class);
+		if (branchVersions.isEmpty()) {
+			throw new BranchNotFoundException("Branch '" + path + "' does not exist.");
+		}
+		return branchVersions.iterator().next();
 	}
 
 	public Branch findAtTimepointOrThrow(String path, Date base) {

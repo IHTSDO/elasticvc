@@ -43,6 +43,11 @@ public class VersionControlHelper {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
+	public BranchCriteria getBranchCriteriaAtBranchCreation(String path) {
+		Branch branch = branchService.findFirstVersionOrThrow(path);
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
+	}
+
 	public BranchCriteria getBranchCriteriaBeforeOpenCommit(Commit commit) {
 		Branch branch = commit.getBranch();
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
