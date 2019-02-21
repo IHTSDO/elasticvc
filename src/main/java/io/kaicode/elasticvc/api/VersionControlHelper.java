@@ -53,6 +53,11 @@ public class VersionControlHelper {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
 	}
 
+	public BranchCriteria getBranchCriteriaAtTimepoint(String path, Date timepoint) {
+		Branch branch = branchService.findAtTimepointOrThrow(path, timepoint);
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
+	}
+
 	public BranchCriteria getBranchCriteriaIncludingOpenCommit(Commit commit) {
 		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), ContentSelection.STANDARD_SELECTION, commit);
 	}
