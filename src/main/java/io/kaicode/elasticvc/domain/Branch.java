@@ -100,14 +100,16 @@ public class Branch extends Entity {
 		return !"MAIN".equals(getPath());
 	}
 
-	@JsonIgnore
 	public long getBaseTimestamp() {
 		return base.getTime();
 	}
 
-	@JsonIgnore
 	public long getHeadTimestamp() {
 		return head.getTime();
+	}
+
+	public long getCreationTimestamp() {
+		return creation.getTime();
 	}
 
 	public void setHead(Date head) {
