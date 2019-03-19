@@ -1,6 +1,5 @@
 package io.kaicode.elasticvc.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
@@ -10,6 +9,11 @@ import java.util.stream.Collectors;
 
 @Document(type = "branch", indexName = "branch", shards = 8)
 public class Branch extends Entity {
+
+	/**
+	 * The root branch path.
+	 */
+	public static final String MAIN = "MAIN";
 
 	@Field(type = FieldType.Date)
 	private Date base;
@@ -97,7 +101,7 @@ public class Branch extends Entity {
 	}
 
 	private boolean notMAIN() {
-		return !"MAIN".equals(getPath());
+		return !MAIN.equals(getPath());
 	}
 
 	public long getBaseTimestamp() {

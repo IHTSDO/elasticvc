@@ -210,6 +210,7 @@ public class BranchServiceTest {
 		metadataA.put("A", "A1");
 		metadataA.put("B", "B1");
 		branchService.create("MAIN", metadataA);
+		makeEmptyCommit("MAIN");
 
 		branchService.create("MAIN/one");
 
@@ -233,7 +234,7 @@ public class BranchServiceTest {
 	}
 
 	private void makeEmptyCommit(String path) {
-		try (Commit commit = branchService.openCommit(path)) {
+		try (Commit commit = branchService.openCommit(path, "Empty commit.")) {
 			commit.markSuccessful();
 		}
 	}

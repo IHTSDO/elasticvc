@@ -26,9 +26,6 @@ public class ComponentService {
 	@Autowired
 	private VersionControlHelper versionControlHelper;
 
-	@Autowired
-	private ElasticsearchTemplate elasticsearchTemplate;
-
 	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
 	public static final int CLAUSE_LIMIT = 800;
 

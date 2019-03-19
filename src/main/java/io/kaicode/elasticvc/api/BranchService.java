@@ -6,7 +6,6 @@ import io.kaicode.elasticvc.repositories.BranchRepository;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
-import org.elasticsearch.search.sort.SortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,15 +18,14 @@ import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilde
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
 @Service
 public class BranchService {
+
+	public static final String LOCK_METADATA_KEY = "lock";
 
 	@Autowired
 	private BranchRepository branchRepository;
@@ -230,28 +228,38 @@ public class BranchService {
 	}
 
 	public Commit openCommit(String path) {
-		return openCommit(path, null, Commit.CommitType.CONTENT);
+		return openCommit(path, null);
 	}
 
-	private Commit openCommit(String branchPath, String mergeSourceBranchPath, Commit.CommitType commitType) {
+	public Commit openCommit(String path, String lockMetadata) {
+		return openCommit(path, null, Commit.CommitType.CONTENT, null, lockMetadata);
+	}
+
+	private Commit openCommit(String branchPath, String mergeSourceBranchPath, Commit.CommitType commitType, String sourceBranchLockMetadata, String targetBranchLockMetadata) {
 		synchronized (branchLockSyncObject) {
 			if (commitType == Commit.CommitType.PROMOTION) {
 				// Lock source branch as well as target
-				lockBranch(mergeSourceBranchPath);
+				lockBranch(mergeSourceBranchPath, sourceBranchLockMetadata);
 			}
-			Branch branch = lockBranch(branchPath);
+			Branch branch = lockBranch(branchPath, targetBranchLockMetadata);
 			Commit commit = new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
 			logger.info("Open commit on {} at {}", branchPath, commit.getTimepoint().getTime());
 			return commit;
 		}
 	}
 
-	private Branch lockBranch(String branchPath) {
+	private Branch lockBranch(String branchPath, String lockMetadata) {
 		Branch branch = findBranchOrThrow(branchPath);
 		if (branch.isLocked()) {
 			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
 		}
 		branch.setLocked(true);
+		Map<String, String> metadata = branch.getMetadata();
+		if (metadata == null) {
+			metadata = new HashMap<>();
+		}
+		metadata.put(LOCK_METADATA_KEY, lockMetadata);
+		branch.setMetadata(metadata);
 		branch = branchRepository.save(branch);
 		return branch;
 	}
@@ -263,7 +271,11 @@ public class BranchService {
 	}
 
 	public Commit openRebaseCommit(String path) {
-		final Commit commit = openCommit(path, null, Commit.CommitType.REBASE);
+		return openRebaseCommit(path, null);
+	}
+
+	public Commit openRebaseCommit(String path, String lockMetadata) {
+		final Commit commit = openCommit(path, null, Commit.CommitType.REBASE, null, lockMetadata);
 		final Branch branch = commit.getBranch();
 		if (!PathUtil.isRoot(path)) {
 			final String parentPath = PathUtil.getParentPath(path);
@@ -275,7 +287,11 @@ public class BranchService {
 	}
 
 	public Commit openPromotionCommit(String path, String sourcePath) {
-		final Commit commit = openCommit(path, sourcePath, Commit.CommitType.PROMOTION);
+		return openPromotionCommit(path, sourcePath, null, null);
+	}
+
+	public Commit openPromotionCommit(String path, String sourcePath, String sourceBranchLockMetadata, String targetBranchLockMetadata) {
+		final Commit commit = openCommit(path, sourcePath, Commit.CommitType.PROMOTION, sourceBranchLockMetadata, targetBranchLockMetadata);
 		commit.setSourceBranchPath(sourcePath);
 		return commit;
 	}
@@ -296,7 +312,7 @@ public class BranchService {
 		final Date timepoint = commit.getTimepoint();
 		final Branch oldBranchTimespan = commit.getBranch();
 		oldBranchTimespan.setEnd(timepoint);
-		oldBranchTimespan.setLocked(false);
+		clearLock(oldBranchTimespan);
 
 		final String path = oldBranchTimespan.getPath();
 		final Branch newBranchTimespan = new Branch(path);
@@ -324,7 +340,7 @@ public class BranchService {
 			// Clear versions replaced on source
 			final Branch oldSourceBranch = findAtTimepointOrThrow(sourceBranchPath, timepoint);
 			oldSourceBranch.setEnd(timepoint);
-			oldSourceBranch.setLocked(false);
+			clearLock(oldSourceBranch);
 			newBranchTimespan.addVersionsReplaced(oldSourceBranch.getVersionsReplaced());
 			newBranchVersionsToSave.add(oldSourceBranch);
 
@@ -360,7 +376,7 @@ public class BranchService {
 		}
 
 		Branch branch = commit.getBranch();
-		branch.setLocked(false);
+		clearLock(branch);
 		branchRepository.save(branch);
 	}
 
@@ -376,7 +392,11 @@ public class BranchService {
 
 		if (!branches.isEmpty()) {
 			final Branch branch = branches.get(0);
-			branch.setLocked(false);
+			clearLock(branch);
+			Map<String, String> metadata = branch.getMetadata();
+			if (metadata != null) {
+				metadata.remove(LOCK_METADATA_KEY);
+			}
 			branchRepository.save(branch);
 		} else {
 			throw new IllegalArgumentException("Branch not found " + path);
@@ -392,5 +412,13 @@ public class BranchService {
 	private Branch illegalState(String message) {
 		logger.error(message);
 		throw new IllegalStateException(message);
+	}
+
+	private void clearLock(Branch branchVersion) {
+		branchVersion.setLocked(false);
+		Map<String, String> metadata = branchVersion.getMetadata();
+		if (metadata != null) {
+			metadata.remove(LOCK_METADATA_KEY);
+		}
 	}
 }
