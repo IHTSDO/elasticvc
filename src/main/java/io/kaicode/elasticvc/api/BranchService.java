@@ -248,7 +248,7 @@ public class BranchService {
 		}
 	}
 
-	private Branch lockBranch(String branchPath, String lockMetadata) {
+	public Branch lockBranch(String branchPath, String lockMetadata) {
 		Branch branch = findBranchOrThrow(branchPath);
 		if (branch.isLocked()) {
 			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
@@ -393,10 +393,6 @@ public class BranchService {
 		if (!branches.isEmpty()) {
 			final Branch branch = branches.get(0);
 			clearLock(branch);
-			Map<String, String> metadata = branch.getMetadata();
-			if (metadata != null) {
-				metadata.remove(LOCK_METADATA_KEY);
-			}
 			branchRepository.save(branch);
 		} else {
 			throw new IllegalArgumentException("Branch not found " + path);
