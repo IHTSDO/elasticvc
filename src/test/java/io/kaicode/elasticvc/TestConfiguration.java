@@ -13,6 +13,7 @@ import pl.allegro.tech.embeddedelasticsearch.EmbeddedElastic;
 import pl.allegro.tech.embeddedelasticsearch.PopularProperties;
 
 import javax.annotation.PreDestroy;
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
@@ -52,11 +53,17 @@ public class TestConfiguration {
 	 */
 	private void createStandaloneTestInstance() {
 		try {
+			File downloadDir = null;
+			if (System.getProperty("user.home") != null) {
+				downloadDir = new File(new File(System.getProperty("user.home"), "tmp"), "embedded-elasticsearch-download-cache");
+				downloadDir.mkdirs();
+			}
 			standaloneTestElasticsearchServer = EmbeddedElastic.builder()
 					.withElasticVersion(ELASTIC_SEARCH_VERSION)
 					.withStartTimeout(30, TimeUnit.SECONDS)
 					.withSetting(PopularProperties.CLUSTER_NAME, "integration-test-cluster")
 					.withSetting(PopularProperties.HTTP_PORT, 9935)
+					.withDownloadDirectory(downloadDir)
 					.build()
 					.start();
 		} catch (IOException | InterruptedException e) {
