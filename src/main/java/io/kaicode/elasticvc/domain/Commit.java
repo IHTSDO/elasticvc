@@ -19,11 +19,11 @@ public class Commit implements AutoCloseable {
 	private final Map<String, Set<String>> entityVersionsReplaced;
 
 	/**
-	 * Transient set of internal ids of the entities which have been replaced or deleted during this commit,
+	 * Transient set of entity ids of the entities which have been deleted during this commit,
 	 * regardless of if they are visible on the parent branch.
 	 * This set is just to help with processing deletions during a commit.
 	 */
-	private final Set<String> entityVersionsDeleted;
+	private final Set<String> entitiesDeleted;
 	private final Set<Class> domainEntityClasses;
 
 	private final CommitType commitType;
@@ -36,7 +36,7 @@ public class Commit implements AutoCloseable {
 		this.branch = branch;
 		this.timepoint = new Date();
 		entityVersionsReplaced = new HashMap<>();
-		entityVersionsDeleted = Collections.synchronizedSet(new HashSet<>());
+		entitiesDeleted = Collections.synchronizedSet(new HashSet<>());
 		domainEntityClasses = Collections.synchronizedSet(new HashSet<>());
 		this.commitType = commitType;
 		this.onSuccess = onSuccess;
@@ -76,8 +76,8 @@ public class Commit implements AutoCloseable {
 		entityVersionsReplaced.computeIfAbsent(entityClass.getSimpleName(), (c) -> new HashSet<>()).addAll(internalIds);
 	}
 
-	public void addVersionsDeleted(Set<String> internalIds) {
-		entityVersionsDeleted.addAll(internalIds);
+	public void addVersionsDeleted(Set<String> entityIds) {
+		entitiesDeleted.addAll(entityIds);
 	}
 
 	public Map<String, Set<String>> getEntityVersionsReplaced() {
@@ -89,8 +89,8 @@ public class Commit implements AutoCloseable {
 		return MapUtil.addAll(branch.getVersionsReplaced(), versions);
 	}
 
-	public Set<String> getEntityVersionsDeleted() {
-		return entityVersionsDeleted;
+	public Set<String> getEntitiesDeleted() {
+		return entitiesDeleted;
 	}
 
 	public void setSourceBranchPath(String sourceBranchPath) {
