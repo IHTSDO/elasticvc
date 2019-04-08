@@ -50,7 +50,7 @@ public class VersionControlHelper {
 
 	public BranchCriteria getBranchCriteriaBeforeOpenCommit(Commit commit) {
 		Branch branch = commit.getBranch();
-		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, commit);
+		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION_BEFORE_THIS_COMMIT, commit);
 	}
 
 	public BranchCriteria getBranchCriteriaAtTimepoint(String path, Date timepoint) {
@@ -115,17 +115,19 @@ public class VersionControlHelper {
 			case STANDARD_SELECTION:
 				// On this branch and started not ended
 				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
-				if (commit != null) {
-					boolQueryShouldClause.must(
-							boolQuery()
-									// If there is a commit started then components should either have not ended
-									// or should have ended at the time of the current commit
-									.should(boolQuery().mustNot(existsQuery("end")))
-									.should(termQuery("end", commit.getTimepoint().getTime()))
-					);
-				} else {
-					boolQueryShouldClause.mustNot(existsQuery("end"));
-				}
+				boolQueryShouldClause.mustNot(existsQuery("end"));
+				// Or any parent branch within time constraints
+				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+				break;
+
+			case STANDARD_SELECTION_BEFORE_THIS_COMMIT:
+				// On this branch and started not ended
+				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
+				boolQueryShouldClause.must(
+						boolQuery()
+								.should(boolQuery().mustNot(existsQuery("end")))
+								.should(termQuery("end", commit.getTimepoint().getTime()))
+				);
 				// Or any parent branch within time constraints
 				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
 				break;
@@ -299,6 +301,7 @@ public class VersionControlHelper {
 
 	enum ContentSelection {
 		STANDARD_SELECTION,
+		STANDARD_SELECTION_BEFORE_THIS_COMMIT,
 		CHANGES_ON_THIS_BRANCH_ONLY,
 		CHANGES_IN_THIS_COMMIT_ONLY,
 		CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY,
