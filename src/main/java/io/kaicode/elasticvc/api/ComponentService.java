@@ -1,5 +1,6 @@
 package io.kaicode.elasticvc.api;
 
+import com.google.common.collect.Lists;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
@@ -8,6 +9,7 @@ import org.elasticsearch.common.util.set.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
@@ -15,7 +17,6 @@ import org.springframework.data.elasticsearch.repository.ElasticsearchCrudReposi
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,6 +26,9 @@ public class ComponentService {
 
 	@Autowired
 	private VersionControlHelper versionControlHelper;
+
+	@Value("${elasticvc.save.batch-size:10000}")
+	private int saveBatchSize;
 
 	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
 	public static final int CLAUSE_LIMIT = 800;
@@ -66,13 +70,16 @@ public class ComponentService {
 		final Set<String> deletedComponentIds = changedOrDeletedComponents.stream().filter(DomainEntity::isDeleted).map(DomainEntity::getId).collect(Collectors.toSet());
 		commit.addVersionsDeleted(deletedComponentIds);
 		if (!changedOrDeletedComponents.isEmpty()) {
-			logger.info("Saving batch of {} {}s", changedOrDeletedComponents.size(), componentClass.getSimpleName());
-			final List<String> ids = changedOrDeletedComponents.stream().map(DomainEntity::getId).collect(Collectors.toList());
-			versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
-			final List<C> changedComponents = changedOrDeletedComponents.stream().filter(d -> !d.isDeleted()).collect(Collectors.toList());
-			if (!changedComponents.isEmpty()) {
-				versionControlHelper.setEntityMeta(changedComponents, commit);
-				repository.saveAll(changedComponents);
+			List<List<C>> batches = Lists.partition(changedOrDeletedComponents, saveBatchSize);
+			for (List<C> batch : batches) {
+				logger.info("Saving batch of {} {}s", batch.size(), componentClass.getSimpleName());
+				final List<String> ids = batch.stream().map(DomainEntity::getId).collect(Collectors.toList());
+				versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
+				final List<C> changedComponents = batch.stream().filter(d -> !d.isDeleted()).collect(Collectors.toList());
+				if (!changedComponents.isEmpty()) {
+					versionControlHelper.setEntityMeta(changedComponents, commit);
+					repository.saveAll(changedComponents);
+				}
 			}
 		}
 		return components.stream().filter(c -> !c.isDeleted()).collect(Collectors.toSet());
@@ -82,4 +89,7 @@ public class ComponentService {
 		return "(" + ((size / CLAUSE_LIMIT) + 1) + " fetches)";
 	}
 
+	public int getSaveBatchSize() {
+		return saveBatchSize;
+	}
 }
