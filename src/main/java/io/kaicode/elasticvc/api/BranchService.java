@@ -417,4 +417,12 @@ public class BranchService {
 			metadata.remove(LOCK_METADATA_KEY);
 		}
 	}
+
+	/**
+	 * Get unmodifiable list of commit listeners. To add a listener use the addCommitListener method.
+	 * @return unmodifiable list of commit listeners.
+	 */
+	public List<CommitListener> getCommitListeners() {
+		return Collections.unmodifiableList(commitListeners);
+	}
 }
