@@ -377,6 +377,11 @@ public class BranchService {
 
 		Branch branch = commit.getBranch();
 		clearLock(branch);
+
+		if (commit.getCommitType() == Commit.CommitType.PROMOTION) {
+			unlock(commit.getSourceBranchPath());
+		}
+
 		branchRepository.save(branch);
 	}
 
