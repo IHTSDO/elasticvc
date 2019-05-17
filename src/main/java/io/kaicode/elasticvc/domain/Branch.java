@@ -7,7 +7,7 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Document(type = "branch", indexName = "branch", shards = 8)
+@Document(indexName = "branch")
 public class Branch extends Entity {
 
 	/**
