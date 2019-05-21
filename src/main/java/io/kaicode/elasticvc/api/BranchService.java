@@ -341,7 +341,12 @@ public class BranchService {
 			final Branch oldSourceBranch = findAtTimepointOrThrow(sourceBranchPath, timepoint);
 			oldSourceBranch.setEnd(timepoint);
 			clearLock(oldSourceBranch);
-			newBranchTimespan.addVersionsReplaced(oldSourceBranch.getVersionsReplaced());
+			if (!PathUtil.isRoot(path)) {
+				newBranchTimespan.addVersionsReplaced(oldSourceBranch.getVersionsReplaced());
+			} else {
+				// Root branch has no need for versions replaced collection.
+				newBranchTimespan.getVersionsReplaced().clear();
+			}
 			newBranchVersionsToSave.add(oldSourceBranch);
 
 			Branch newSourceBranch = new Branch(sourceBranchPath);

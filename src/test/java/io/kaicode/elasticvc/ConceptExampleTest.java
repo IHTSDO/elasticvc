@@ -95,7 +95,17 @@ public class ConceptExampleTest {
 
 		assertEquals("Branch MAIN/A should now record 1 version replaced because concept 2 exists on the parent branch." +
 						"This allows the version control system to hide the version on MAIN when finding domain entities.",
-				1, branchService.findLatest(branch).getVersionsReplaced().get("Concept").size());
+				1, branchService.findLatest(branch).getVersionsReplaced().getOrDefault("Concept", Collections.emptySet()).size());
+
+		try (Commit commit = branchService.openPromotionCommit("MAIN", "MAIN/A")) {
+			commit.markSuccessful();
+		}
+
+		assertEquals("Branch MAIN/A should now record 0 versions replaced because it's content changes have been promoted.",
+				0, branchService.findLatest("MAIN/A").getVersionsReplaced().getOrDefault("Concept", Collections.emptySet()).size());
+		assertEquals("Branch MAIN always have 0 versions replaced because it has no parents so this is not needed during content selection.",
+				0, branchService.findLatest("MAIN").getVersionsReplaced().getOrDefault("Concept", Collections.emptySet()).size());
+
 	}
 
 	@After
