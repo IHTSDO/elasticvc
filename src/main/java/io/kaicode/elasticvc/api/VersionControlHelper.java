@@ -106,24 +106,29 @@ public class VersionControlHelper {
 	}
 
 	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit) {
-		final BoolQueryBuilder boolQueryShouldClause = boolQuery();
-		final BoolQueryBuilder branchCriteria =
-				boolQuery().should(boolQueryShouldClause.must(termQuery("path", branch.getPath())));
+
+		final BoolQueryBuilder branchCriteria = boolQuery();
+		// When adding top level clauses to the branchCriteria BoolQueryBuilder we must either use all 'should' clauses or all 'must' clauses.
+		// If any 'must' clauses are given then the 'should' clauses do not have to match in Elasticsearch.
+		// We will use a 'should' clause to select content from each branch that can match (usually this branch and ancestors).
+
+		final BoolQueryBuilder thisBranchShouldClause = boolQuery().must(termQuery("path", branch.getPath()));
+		branchCriteria.should(thisBranchShouldClause);
 
 		Map<String, Set<String>> allEntityVersionsReplaced = null;
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
 				// On this branch and started not ended
-				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
-				boolQueryShouldClause.mustNot(existsQuery("end"));
+				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
+				thisBranchShouldClause.mustNot(existsQuery("end"));
 				// Or any parent branch within time constraints
 				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
 				break;
 
 			case STANDARD_SELECTION_BEFORE_THIS_COMMIT:
 				// On this branch and started not ended
-				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
-				boolQueryShouldClause.must(
+				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
+				thisBranchShouldClause.must(
 						boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
 								.should(termQuery("end", commit.getTimepoint().getTime()))
@@ -134,19 +139,19 @@ public class VersionControlHelper {
 
 			case CHANGES_ON_THIS_BRANCH_ONLY:
 				// On this branch and started not ended
-				boolQueryShouldClause.must(rangeQuery("start").lte(timepoint.getTime()))
+				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()))
 						.mustNot(existsQuery("end"));
 				break;
 
 			case CHANGES_IN_THIS_COMMIT_ONLY:
 				// On this branch and started at commit date, not ended
-				boolQueryShouldClause.must(termQuery("start", timepoint.getTime()))
+				thisBranchShouldClause.must(termQuery("start", timepoint.getTime()))
 						.mustNot(existsQuery("end"));
 				break;
 
 			case CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY:
 				// On this branch and started at commit date, not ended
-				boolQueryShouldClause.must(boolQuery()
+				thisBranchShouldClause.must(boolQuery()
 						.should(termQuery("start", timepoint.getTime()))
 						.should(termQuery("end", timepoint.getTime())));
 
@@ -169,6 +174,7 @@ public class VersionControlHelper {
 
 					// Add all branch time ranges to selection criteria
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
+						// Add other should clauses for other branches
 						branchCriteria.should(boolQuery()
 								.must(termQuery("path", branchTimeRange.getPath()))
 								.must(rangeQuery("start").gt(branchTimeRange.getStart().getTime()))
@@ -184,8 +190,7 @@ public class VersionControlHelper {
 
 			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH: {
 					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
-				branchCriteria.must(termQuery("path", branch.getPath()));
-				branchCriteria.must(boolQuery()
+				thisBranchShouldClause.must(boolQuery()
 							.should(rangeQuery("start").gte(startPoint))
 							.should(rangeQuery("end").gte(startPoint)));
 				}
@@ -193,14 +198,15 @@ public class VersionControlHelper {
 
 			case UNPROMOTED_CHANGES_ON_THIS_BRANCH: {
 					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
-				branchCriteria.must(termQuery("path", branch.getPath()));
-				branchCriteria
+				thisBranchShouldClause
 							.must(rangeQuery("start").gte(startPoint))
 							.mustNot(existsQuery("end"));
 				}
 				break;
 		}
-		return new BranchCriteria(branchCriteria, allEntityVersionsReplaced);
+		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
+		BoolQueryBuilder must = boolQuery().must(branchCriteria);
+		return new BranchCriteria(must, allEntityVersionsReplaced);
 	}
 
 	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced) {
