@@ -3,6 +3,7 @@ package io.kaicode.elasticvc.domain;
 import io.kaicode.elasticvc.api.MapUtil;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class Commit implements AutoCloseable {
@@ -35,7 +36,7 @@ public class Commit implements AutoCloseable {
 	public Commit(Branch branch, CommitType commitType, Consumer<Commit> onSuccess, Consumer<Commit> onFailure) {
 		this.branch = branch;
 		this.timepoint = new Date();
-		entityVersionsReplaced = new HashMap<>();
+		entityVersionsReplaced = new ConcurrentHashMap<>();
 		entitiesDeleted = Collections.synchronizedSet(new HashSet<>());
 		domainEntityClasses = Collections.synchronizedSet(new HashSet<>());
 		this.commitType = commitType;
