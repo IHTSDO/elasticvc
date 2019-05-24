@@ -17,6 +17,7 @@ import org.springframework.data.util.CloseableIterator;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -69,6 +70,10 @@ public class VersionControlHelper {
 
 	public BranchCriteria getChangesOnBranchCriteria(Branch branch) {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY, null);
+	}
+
+	public BranchCriteria getChangesOnBranchIncludingOpenCommit(Commit commit) {
+		return getBranchCriteria(commit.getBranch(), commit.getTimepoint(), commit.getEntityVersionsReplacedIncludingFromBranch(), ContentSelection.CHANGES_ON_THIS_BRANCH_ONLY, commit);
 	}
 
 	public BranchCriteria getBranchCriteriaChangesWithinOpenCommitOnly(Commit commit) {
@@ -230,32 +235,7 @@ public class VersionControlHelper {
 
 	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchCrudRepository repository) {
 		// End versions of the entity on this path by setting end date
-		final NativeSearchQuery query = new NativeSearchQueryBuilder()
-				.withQuery(
-						new BoolQueryBuilder()
-								.must(termQuery("path", commit.getBranch().getPath()))
-								.must(rangeQuery("start").lt(commit.getTimepoint().getTime()))
-								.mustNot(existsQuery("end"))
-				)
-				.withFilter(
-						new BoolQueryBuilder()
-								.must(termsQuery(idField, ids))
-				)
-				.withPageable(LARGE_PAGE)
-				.build();
-
-		List<T> toSave = new ArrayList<>();
-		try (final CloseableIterator<T> localVersionsToEnd = elasticsearchTemplate.stream(query, entityClass)) {
-			localVersionsToEnd.forEachRemaining(version -> {
-				version.setEnd(commit.getTimepoint());
-				toSave.add(version);
-			});
-		}
-		if (!toSave.isEmpty()) {
-			repository.saveAll(toSave);
-			logger.debug("Ended {} {} {}", toSave.size(), entityClass.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
-			toSave.clear();
-		}
+		endOldVersionsOnThisBranch(commit, idField, null, entityClass, ids, repository);
 
 		// Hide versions of the entity on other paths from this branch
 		final NativeSearchQuery query2 = new NativeSearchQueryBuilder()
@@ -282,6 +262,43 @@ public class VersionControlHelper {
 		commit.addVersionsReplaced(versionsReplaced, entityClass);
 
 		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
+	}
+
+	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Commit commit, String idField, @Nullable BoolQueryBuilder selectionClause,
+			Class<T> entityClass, Collection<?> ids, ElasticsearchCrudRepository repository) {
+
+		if (ids.isEmpty()) {
+			return;
+		}
+
+		BoolQueryBuilder filterBuilder = boolQuery().must(termsQuery(idField, ids));
+		if (selectionClause != null) {
+			filterBuilder.must(selectionClause);
+		}
+
+		final NativeSearchQuery query = new NativeSearchQueryBuilder()
+				.withQuery(
+						boolQuery()
+								.must(termQuery("path", commit.getBranch().getPath()))
+								.must(rangeQuery("start").lt(commit.getTimepoint().getTime()))
+								.mustNot(existsQuery("end"))
+				)
+				.withFilter(filterBuilder)
+				.withPageable(LARGE_PAGE)
+				.build();
+
+		List<T> toSave = new ArrayList<>();
+		try (final CloseableIterator<T> localVersionsToEnd = elasticsearchTemplate.stream(query, entityClass)) {
+			localVersionsToEnd.forEachRemaining(version -> {
+				version.setEnd(commit.getTimepoint());
+				toSave.add(version);
+			});
+		}
+		if (!toSave.isEmpty()) {
+			repository.saveAll(toSave);
+			logger.debug("Ended {} {} {}", toSave.size(), entityClass.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
+			toSave.clear();
+		}
 	}
 
 	void setEntityMeta(Entity entity, Commit commit) {
