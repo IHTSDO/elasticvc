@@ -5,6 +5,7 @@ import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.domain.Entity;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -264,7 +265,7 @@ public class VersionControlHelper {
 		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
 	}
 
-	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Commit commit, String idField, @Nullable BoolQueryBuilder selectionClause,
+	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Commit commit, String idField, @Nullable QueryBuilder selectionClause,
 			Class<T> entityClass, Collection<?> ids, ElasticsearchCrudRepository repository) {
 
 		if (ids.isEmpty()) {
