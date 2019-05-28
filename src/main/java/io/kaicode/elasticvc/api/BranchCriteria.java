@@ -28,7 +28,7 @@ public class BranchCriteria {
 						.mustNot(termsQuery("_id", values));
 			}
 		}
-		return branchCriteria;
+		return boolQuery().must(branchCriteria);
 	}
 
 	@Override
