@@ -35,7 +35,7 @@ public class BranchCriteria {
 	public String toString() {
 		return "BranchCriteria{" +
 				"branchCriteria=" + branchCriteria +
-				", allEntityVersionsReplaced=" + allEntityVersionsReplaced.size() +
+				", allEntityVersionsReplaced=" + (allEntityVersionsReplaced != null ? allEntityVersionsReplaced.size() : 0) +
 				'}';
 	}
 }

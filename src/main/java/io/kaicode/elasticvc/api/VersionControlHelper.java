@@ -236,7 +236,7 @@ public class VersionControlHelper {
 
 	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchCrudRepository repository) {
 		// End versions of the entity on this path by setting end date
-		endOldVersionsOnThisBranch(commit, idField, null, entityClass, ids, repository);
+		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
 
 		// Hide versions of the entity on other paths from this branch
 		final NativeSearchQuery query2 = new NativeSearchQueryBuilder()
@@ -265,14 +265,21 @@ public class VersionControlHelper {
 		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
 	}
 
-	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Commit commit, String idField, @Nullable QueryBuilder selectionClause,
-			Class<T> entityClass, Collection<?> ids, ElasticsearchCrudRepository repository) {
+	public <T extends DomainEntity> void endAllVersionsOnThisBranch(Class<T> entityClass, @Nullable QueryBuilder selectionClause, Commit commit, ElasticsearchCrudRepository repository) {
+		endOldVersionsOnThisBranch(entityClass, null, null, selectionClause, commit, repository);
+	}
 
-		if (ids.isEmpty()) {
+	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Class<T> entityClass, Collection<?> ids, String idField, QueryBuilder selectionClause,
+			Commit commit, ElasticsearchCrudRepository repository) {
+
+		if (ids != null && ids.isEmpty()) {
 			return;
 		}
 
-		BoolQueryBuilder filterBuilder = boolQuery().must(termsQuery(idField, ids));
+		BoolQueryBuilder filterBuilder = boolQuery();
+		if (ids != null) {
+			filterBuilder.must(termsQuery(idField, ids));
+		}
 		if (selectionClause != null) {
 			filterBuilder.must(selectionClause);
 		}
