@@ -10,8 +10,11 @@ import org.elasticsearch.search.sort.SortBuilders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.core.aggregation.AggregatedPage;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
@@ -204,14 +207,15 @@ public class BranchService {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(boolQuery()
 						.must(termQuery("path", path))
-						.must(rangeQuery("start").lte(base.getTime()))
+						.must(rangeQuery("base").lte(timepoint.getTime()))
 						.must(boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
-								.should(rangeQuery("end").gt(base.getTime())))
-			).build(), Branch.class);
-		Assert.isTrue(branches.size() < 2, "There should not be more than one version of a branch at a single timepoint.");
+								.should(rangeQuery("end").gt(timepoint.getTime()))))
+				.withSort(SortBuilders.fieldSort("start"))
+				.withPageable(PageRequest.of(0, 1))
+				.build(), Branch.class);
 		if (branches.isEmpty()) {
-			throw new IllegalStateException("Branch '" + path + "' does not exist at timepoint " + base + ".");
+			throw new IllegalStateException("Branch '" + path + "' does not exist at timepoint " + timepoint + " (" + timepoint.getTime() + ").");
 		}
 
 		return branches.get(0);

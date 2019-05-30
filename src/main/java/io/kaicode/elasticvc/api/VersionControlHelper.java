@@ -103,6 +103,34 @@ public class VersionControlHelper {
 				);
 	}
 
+	public BoolQueryBuilder getUpdatesOnBranchOrAncestorsDuringRangeQuery(String path, Date start, Date end) {
+		List<Branch> startTimeSlice = getTimeSlice(path, start);
+		List<Branch> endTimeSlice = getTimeSlice(path, end);
+
+		BoolQueryBuilder shouldsQuery = boolQuery();
+		for (int i = 0; i < startTimeSlice.size(); i++) {
+			Branch startBranchTimepoint = startTimeSlice.get(i);
+			Branch endBranchTimepoint = endTimeSlice.get(i);
+			if (!startBranchTimepoint.getHead().equals(endBranchTimepoint.getHead())) {
+				Date startDate = startBranchTimepoint.getHead();
+				Date endDate = endBranchTimepoint.getHead();
+				if (startBranchTimepoint.getPath().equals(path)) {
+					startDate = start;
+					endDate = end;
+				}
+				shouldsQuery.should(
+						boolQuery()
+								.must(termQuery("path", startBranchTimepoint.getPath()))
+								.must(boolQuery()
+										.should(rangeQuery("start").gte(startDate).lte(endDate))
+										.should(rangeQuery("end").gte(startDate).lte(endDate))
+								)
+						);
+			}
+		}
+		return boolQuery().must(shouldsQuery);
+	}
+
 	private Branch getBranchOrThrow(String path) {
 		final Branch branch = branchService.findLatest(path);
 		if (branch == null) {
@@ -234,6 +262,21 @@ public class VersionControlHelper {
 		return versionsReplaced;
 	}
 
+	public List<Branch> getTimeSlice(String branchPath, Date timepoint) {
+		List<Branch> branches = new ArrayList<>();
+		addBranchAndAncestors(branchPath, timepoint, branches);
+		return branches;
+	}
+
+	private void addBranchAndAncestors(String branchPath, Date timepoint, List<Branch> branches) {
+		Branch branch = branchService.findAtTimepointOrThrow(branchPath, timepoint);
+		branches.add(branch);
+		if (!PathUtil.isRoot(branchPath)) {
+			String parentPath = PathUtil.getParentPath(branchPath);
+			addBranchAndAncestors(parentPath, branch.getBase(), branches);
+		}
+	}
+
 	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchCrudRepository repository) {
 		// End versions of the entity on this path by setting end date
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
@@ -307,6 +350,17 @@ public class VersionControlHelper {
 			logger.debug("Ended {} {} {}", toSave.size(), entityClass.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
 			toSave.clear();
 		}
+	}
+
+	public Map<String, Set<String>> getAllVersionsReplaced(List<Branch> timeSlice) {
+		Map<String, Set<String>> allVersionsReplaced = new HashMap<>();
+		for (Branch branch : timeSlice) {
+			Map<String, Set<String>> branchVersionsReplaced = branch.getVersionsReplaced();
+			for (String type : branchVersionsReplaced.keySet()) {
+				allVersionsReplaced.computeIfAbsent(type, t -> new HashSet<>()).addAll(branchVersionsReplaced.get(type));
+			}
+		}
+		return allVersionsReplaced;
 	}
 
 	void setEntityMeta(Entity entity, Commit commit) {

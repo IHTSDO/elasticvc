@@ -230,4 +230,20 @@ public class Branch extends Entity {
 	private Long getMillis(Date date) {
 		return date == null ? null : date.getTime();
 	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		Branch branch = (Branch) o;
+		return Objects.equals(getPath(), branch.getPath()) &&
+				Objects.equals(base, branch.base) &&
+				Objects.equals(head, branch.head) &&
+				Objects.equals(lastPromotion, branch.lastPromotion);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(getPath(), base, head, lastPromotion);
+	}
 }
