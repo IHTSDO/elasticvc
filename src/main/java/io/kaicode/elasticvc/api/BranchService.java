@@ -191,9 +191,18 @@ public class BranchService {
 		return branchVersions.iterator().next();
 	}
 
-	public Branch findAtTimepointOrThrow(String path, Date base) {
-		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder().withQuery(
-				new BoolQueryBuilder()
+	public Page<Branch> findAllVersions(String path, Pageable pageable) {
+		return elasticsearchTemplate.queryForPage(
+				new NativeSearchQueryBuilder()
+						.withQuery(termQuery("path", path))
+						.withSort(SortBuilders.fieldSort("start"))
+						.withPageable(pageable)
+						.build(), Branch.class);
+	}
+
+	public Branch findAtTimepointOrThrow(String path, Date timepoint) {
+		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+				.withQuery(boolQuery()
 						.must(termQuery("path", path))
 						.must(rangeQuery("start").lte(base.getTime()))
 						.must(boolQuery()
@@ -311,12 +320,16 @@ public class BranchService {
 
 		final Date timepoint = commit.getTimepoint();
 		final Branch oldBranchTimespan = commit.getBranch();
-		oldBranchTimespan.setEnd(timepoint);
+		Date newBase = oldBranchTimespan.getBase();
+		if (commit.isRebase()) {
+			resetBranchBase(commit);
+		}
 		clearLock(oldBranchTimespan);
+		oldBranchTimespan.setEnd(timepoint);
 
 		final String path = oldBranchTimespan.getPath();
 		final Branch newBranchTimespan = new Branch(path);
-		newBranchTimespan.setBase(oldBranchTimespan.getBase());
+		newBranchTimespan.setBase(newBase);
 		newBranchTimespan.setStart(timepoint);
 		newBranchTimespan.setHead(timepoint);
 		newBranchTimespan.setMetadata(oldBranchTimespan.getMetadata());
@@ -381,6 +394,9 @@ public class BranchService {
 		}
 
 		Branch branch = commit.getBranch();
+		if (commit.isRebase()) {
+			resetBranchBase(commit);
+		}
 		clearLock(branch);
 
 		if (commit.getCommitType() == Commit.CommitType.PROMOTION) {
@@ -388,6 +404,10 @@ public class BranchService {
 		}
 
 		branchRepository.save(branch);
+	}
+
+	private void resetBranchBase(Commit commit) {
+		commit.getBranch().setBase(commit.getRebasePreviousBase());
 	}
 
 	public void unlock(String path) {
