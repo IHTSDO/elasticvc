@@ -31,7 +31,7 @@ public class ComponentService {
 	private int saveBatchSize;
 
 	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
-	public static final int CLAUSE_LIMIT = 800;
+	public static final int CLAUSE_LIMIT = 65_000;
 
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
