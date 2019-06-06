@@ -45,9 +45,14 @@ public class VersionControlHelper {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
-	public BranchCriteria getBranchCriteriaAtBranchCreation(String path) {
+	public BranchCriteria getBranchCriteriaAtBranchCreationTimepoint(String path) {
 		Branch branch = branchService.findFirstVersionOrThrow(path);
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
+	}
+
+	public BranchCriteria getBranchCriteriaAtBranchBaseTimepoint(String path) {
+		final Branch branch = getBranchOrThrow(path);
+		return getBranchCriteria(branch, branch.getBase(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
 	public BranchCriteria getBranchCriteriaBeforeOpenCommit(Commit commit) {
