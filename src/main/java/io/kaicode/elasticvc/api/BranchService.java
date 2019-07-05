@@ -14,7 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
-import org.springframework.data.elasticsearch.core.aggregation.AggregatedPage;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
@@ -22,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
@@ -230,10 +230,22 @@ public class BranchService {
 	}
 
 	public List<Branch> findChildren(String path) {
-		return elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+		return findChildren(path, false); //All descendants by default
+	}
+	
+	public List<Branch> findChildren(String path, boolean immediateChildren) {
+		List<Branch> children = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", path + "/")))
 				.withSort(new FieldSortBuilder("path"))
 				.build(), Branch.class);
+		
+		if (immediateChildren) {
+			Branch parent = findBranchOrThrow(path);
+			children = children.stream()
+					.filter(child -> parent.isParent(child))
+					.collect(Collectors.toList());
+		} 
+		return children;
 	}
 
 	public boolean branchesHaveParentChildRelationship(Branch branchA, Branch branchB) {
