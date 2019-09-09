@@ -80,32 +80,41 @@
 					<altDeploymentRepository>internal.repo::default::file://${project.build.directory}/mvn-repo</altDeploymentRepository>
 				</configuration>
 			</plugin>
-			<plugin>
-				<groupId>com.github.github</groupId>
-				<artifactId>site-maven-plugin</artifactId>
-				<version>0.11</version>
-				<configuration>
-					<message>Maven artifacts for ${project.version}</message>
-					<noJekyll>true</noJekyll>
-					<outputDirectory>${project.build.directory}/mvn-repo</outputDirectory>
-					<branch>refs/heads/mvn-repo</branch>
-					<includes><include>**/*</include></includes>
-					<repositoryName>elasticvc</repositoryName>
-					<repositoryOwner>kaicode</repositoryOwner>
-					<!--<merge>true</merge>-->
-				</configuration>
-				<executions>
-					<!-- run site-maven-plugin's 'site' target as part of the build's normal 'deploy' phase -->
-					<execution>
-						<goals>
-							<goal>site</goal>
-						</goals>
-						<phase>deploy</phase>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 	</build>
+	<profiles>
+		<profile>
+			<id>deploy-to-github</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>com.github.github</groupId>
+						<artifactId>site-maven-plugin</artifactId>
+						<version>0.11</version>
+						<configuration>
+							<message>Maven artifacts for ${project.version}</message>
+							<noJekyll>true</noJekyll>
+							<outputDirectory>${project.build.directory}/mvn-repo</outputDirectory>
+							<branch>refs/heads/mvn-repo</branch>
+							<includes><include>**/*</include></includes>
+							<repositoryName>elasticvc</repositoryName>
+							<repositoryOwner>kaicode</repositoryOwner>
+							<!--<merge>true</merge>-->
+						</configuration>
+						<executions>
+							<!-- run site-maven-plugin's 'site' target as part of the build's normal 'deploy' phase -->
+							<execution>
+								<goals>
+									<goal>site</goal>
+								</goals>
+								<phase>deploy</phase>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 	<repositories>
 		<repository>
 			<id>spring-milestones</id>
