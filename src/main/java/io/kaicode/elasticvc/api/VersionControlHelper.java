@@ -50,9 +50,13 @@ public class VersionControlHelper {
 		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
-	public BranchCriteria getBranchCriteriaAtBranchBaseTimepoint(String path) {
+	public BranchCriteria getBranchCriteriaForParentBranchAtBranchBaseTimepoint(String path) {
+		if (PathUtil.isRoot(path)) {
+			throw new IllegalArgumentException("Can not access the base timepoint of the root branch.");
+		}
 		final Branch branch = getBranchOrThrow(path);
-		return getBranchCriteria(branch, branch.getBase(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
+		Branch parentBranch = getBranchOrThrow(PathUtil.getParentPath(path));
+		return getBranchCriteria(parentBranch, branch.getBase(), parentBranch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
 	}
 
 	public BranchCriteria getBranchCriteriaBeforeOpenCommit(Commit commit) {
