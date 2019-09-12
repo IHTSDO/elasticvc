@@ -300,13 +300,24 @@ public class BranchService {
 	}
 
 	public Commit openRebaseCommit(String path, String lockMetadata) {
+		return doOpenRebaseCommit(path, lockMetadata, null);
+	}
+
+	public Commit openRebaseToSpecificParentTimepointCommit(String path, Date specificParentTimepoint, String lockMetadata) {
+		return doOpenRebaseCommit(path, lockMetadata, specificParentTimepoint);
+	}
+
+	private Commit doOpenRebaseCommit(String path, String lockMetadata, Date specificParentTimepoint) {
 		final Commit commit = openCommit(path, null, Commit.CommitType.REBASE, null, lockMetadata);
 		final Branch branch = commit.getBranch();
 		if (!PathUtil.isRoot(path)) {
 			final String parentPath = PathUtil.getParentPath(path);
-			final Branch parentBranch = findAtTimepointOrThrow(parentPath, commit.getTimepoint());
-			commit.setRebasePreviousBase(branch.getBase());
+			final Branch parentBranch = findAtTimepointOrThrow(parentPath, specificParentTimepoint != null ? specificParentTimepoint : commit.getTimepoint());
+			if (specificParentTimepoint != null && !parentBranch.getHead().equals(specificParentTimepoint)) {
+				throw new IllegalStateException(String.format("Specific timepoint %s requested but not found for branch %s", specificParentTimepoint.getTime(), parentBranch));
+			}
 			branch.setBase(parentBranch.getHead());
+			commit.setRebasePreviousBase(branch.getBase());
 		}
 		return commit;
 	}
