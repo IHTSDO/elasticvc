@@ -7,6 +7,7 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -215,6 +216,16 @@ public class BranchService {
 				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class);
 		if (branches.isEmpty()) {
+			final List<Branch> last30 = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+					.withQuery(boolQuery()
+							.must(termQuery("path", path)))
+					.withSort(SortBuilders.fieldSort("start").order(SortOrder.DESC))
+					.withPageable(PageRequest.of(0, 30))
+					.build(), Branch.class);
+			logger.info("Branch version missing. Logging last 30 versions:");
+			for (Branch branchVersion : last30) {
+				logger.info("- Branch version {}", branchVersion);
+			}
 			throw new IllegalStateException("Branch '" + path + "' does not exist at timepoint " + timepoint + " (" + timepoint.getTime() + ").");
 		}
 
@@ -316,8 +327,8 @@ public class BranchService {
 			if (specificParentTimepoint != null && !parentBranch.getHead().equals(specificParentTimepoint)) {
 				throw new IllegalStateException(String.format("Specific timepoint %s requested but not found for branch %s", specificParentTimepoint.getTime(), parentBranch));
 			}
-			branch.setBase(parentBranch.getHead());
 			commit.setRebasePreviousBase(branch.getBase());
+			branch.setBase(parentBranch.getHead());
 		}
 		return commit;
 	}
