@@ -52,14 +52,18 @@ public class BranchService {
 	}
 
 	public Branch create(String path, Map<String, String> metadata) {
-		return doCreate(path, false, new Date(), metadata);
+		return doCreate(path, false, new Date(), metadata, null);
+	}
+
+	public void createAtBaseTimepoint(String path, Date specificBaseTimepoint) {
+		doCreate(path, false, new Date(), null, specificBaseTimepoint);
 	}
 
 	public Branch recursiveCreate(String path) {
-		return doCreate(path, true, new Date(), null);
+		return doCreate(path, true, new Date(), null, null);
 	}
 
-	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Map<String, String> metadata) {
+	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Map<String, String> metadata, Date specificBaseTimepoint) {
 		Assert.notNull(path, "Branch path can not be null.");
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
 
@@ -73,7 +77,7 @@ public class BranchService {
 			parentBranch = findLatest(parentPath);
 			if (parentBranch == null) {
 				if (recursive) {
-					doCreate(parentPath, true, commitTimepoint, null);
+					doCreate(parentPath, true, commitTimepoint, null, specificBaseTimepoint);
 				} else {
 					throw new IllegalStateException("Parent branch '" + parentPath + "' does not exist.");
 				}
@@ -82,7 +86,11 @@ public class BranchService {
 		}
 
 		Branch branch = new Branch(path);
-		branch.setBase(parentBranch == null ? commitTimepoint : parentBranch.getHead());
+		Date base = parentBranch == null ? commitTimepoint : parentBranch.getHead();
+		if (specificBaseTimepoint != null) {
+			base = specificBaseTimepoint;
+		}
+		branch.setBase(base);
 		branch.setHead(commitTimepoint);
 		branch.setStart(commitTimepoint);
 		branch.setMetadataInternal(metadata);
@@ -243,19 +251,19 @@ public class BranchService {
 	public List<Branch> findChildren(String path) {
 		return findChildren(path, false); //All descendants by default
 	}
-	
+
 	public List<Branch> findChildren(String path, boolean immediateChildren) {
 		List<Branch> children = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", path + "/")))
 				.withSort(new FieldSortBuilder("path"))
 				.build(), Branch.class);
-		
+
 		if (immediateChildren) {
 			Branch parent = findBranchOrThrow(path);
 			children = children.stream()
 					.filter(child -> parent.isParent(child))
 					.collect(Collectors.toList());
-		} 
+		}
 		return children;
 	}
 
