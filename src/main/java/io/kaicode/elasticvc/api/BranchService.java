@@ -212,6 +212,17 @@ public class BranchService {
 						.build(), Branch.class);
 	}
 
+	public Page<Branch> findAllVersionsAfterTimestamp(String path, Date timestamp, Pageable pageable) {
+		return elasticsearchTemplate.queryForPage(
+				new NativeSearchQueryBuilder()
+						.withQuery(boolQuery()
+								.must(termQuery("path", path))
+								.must(rangeQuery("start").gt(timestamp.getTime())))
+						.withSort(SortBuilders.fieldSort("start"))
+						.withPageable(pageable)
+						.build(), Branch.class);
+	}
+
 	public Branch findAtTimepointOrThrow(String path, Date timepoint) {
 		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
 				.withQuery(boolQuery()
