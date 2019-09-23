@@ -1,10 +1,14 @@
 package io.kaicode.elasticvc.api;
 
+import com.google.common.collect.Iterators;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
+import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.repositories.BranchRepository;
+import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.script.Script;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
@@ -15,15 +19,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
-import org.springframework.data.elasticsearch.core.query.DeleteQuery;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
+import org.springframework.data.elasticsearch.core.query.*;
+import org.springframework.data.util.CloseableIterator;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static io.kaicode.elasticvc.api.VersionControlHelper.LARGE_PAGE;
 import static org.elasticsearch.index.query.QueryBuilders.*;
 
 @Service
@@ -305,6 +309,10 @@ public class BranchService {
 
 	public Branch lockBranch(String branchPath, String lockMetadata) {
 		Branch branch = findBranchOrThrow(branchPath);
+		return lockBranch(branch, lockMetadata);
+	}
+
+	private Branch lockBranch(Branch branch, String lockMetadataMessage) {
 		if (branch.isLocked()) {
 			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
 		}
@@ -313,7 +321,7 @@ public class BranchService {
 		if (metadata == null) {
 			metadata = new HashMap<>();
 		}
-		metadata.put(LOCK_METADATA_KEY, lockMetadata);
+		metadata.put(LOCK_METADATA_KEY, lockMetadataMessage);
 		branch.setMetadata(metadata);
 		branch = branchRepository.save(branch);
 		return branch;
@@ -461,6 +469,82 @@ public class BranchService {
 		}
 
 		branchRepository.save(branch);
+	}
+
+	public void rollbackCompletedCommit(Branch branchVersion, List<Class<? extends DomainEntity>> domainTypes) {
+		long timestamp = branchVersion.getHeadTimestamp();
+		String path = branchVersion.getPath();
+		boolean lockedInitially = branchVersion.isLocked();
+		logger.info("Rolling back commit {} on {}.", timestamp, path);
+
+		// Delete branch/commit then immediately lock the branch (again)
+		Branch previousBranchVersion = findAtTimepointOrThrow(path, new Date(timestamp - 1));
+		branchRepository.delete(branchVersion);
+		previousBranchVersion.setEnd(null);
+		// (Also saves the branch version)
+		lockBranch(previousBranchVersion, getLockMessageOrNull(branchVersion));
+
+		logger.info("Deleting documents on {} started at {}.", path, timestamp);
+		DeleteQuery deleteQuery = new DeleteQuery();
+		deleteQuery.setQuery(new BoolQueryBuilder()
+				.must(termQuery("path", path))
+				.must(termQuery("start", timestamp)));
+		for (Class<? extends DomainEntity> domainEntityClass : domainTypes) {
+			elasticsearchTemplate.delete(deleteQuery, domainEntityClass);
+			elasticsearchTemplate.refresh(domainEntityClass);
+		}
+
+		logger.info("Clearing end time for documents on {} ended at {}.", timestamp, path);
+
+		for (Class<? extends DomainEntity> type : domainTypes) {
+
+			// Find ended documents
+			Set<String> endedDocumentIds = new HashSet<>();
+			NativeSearchQuery endedDocumentQuery = new NativeSearchQueryBuilder()
+					.withQuery(boolQuery()
+							.must(termQuery("end", timestamp))
+							.must(termQuery("path", path)))
+					.withFields("internalId")
+					.withPageable(LARGE_PAGE).build();
+			try (final CloseableIterator<? extends DomainEntity> endedDocs = elasticsearchTemplate.stream(endedDocumentQuery, type)) {
+				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getInternalId()));
+			}
+
+			// Clear end dates
+			List<UpdateQuery> updateQueries = new ArrayList<>();
+			for (String internalId : endedDocumentIds) {
+				UpdateRequest updateRequest = new UpdateRequest();
+				updateRequest.script(new Script("ctx._source.remove('end')"));
+
+				updateQueries.add(new UpdateQueryBuilder()
+						.withClass(type)
+						.withId(internalId)
+						.withUpdateRequest(updateRequest)
+						.build());
+			}
+			Iterators.partition(updateQueries.iterator(), 1_000).forEachRemaining(updateQueryBatch -> {
+				if (!updateQueryBatch.isEmpty()) {
+					elasticsearchTemplate.bulkUpdate(updateQueryBatch);
+				}
+			});
+
+			elasticsearchTemplate.refresh(type);
+			logger.info("{} ended documents restored for type {}.", endedDocumentIds.size(), type.getSimpleName());
+		}
+
+		if (!lockedInitially) {
+			unlock(path);
+		}
+
+		logger.info("Completed rollback of commit {} on {}.", timestamp, path);
+	}
+
+	public String getLockMessageOrNull(Branch branchVersion) {
+		Map<String, String> metadata = branchVersion.getMetadata();
+		if (metadata != null) {
+			return metadata.get(LOCK_METADATA_KEY);
+		}
+		return null;
 	}
 
 	private void resetBranchBase(Commit commit) {
