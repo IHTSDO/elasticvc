@@ -5,7 +5,7 @@
 
 	<groupId>io.kaicode</groupId>
 	<artifactId>elasticvc</artifactId>
-	<version>2.6.0</version>
+	<version>2.6.1-SNAPSHOT</version>
 
 	<name>ElasticVC</name>
 	<description>A Version Control System using Elasticsearch</description>
