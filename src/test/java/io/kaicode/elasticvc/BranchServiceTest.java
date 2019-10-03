@@ -53,6 +53,20 @@ public class BranchServiceTest {
 		assertEquals(UP_TO_DATE, a.getState());
 
 		assertNotNull(branchService.findLatest("MAIN"));
+
+		try {
+			branchService.create("123");
+			fail("Expected an exception.");
+		} catch (IllegalArgumentException e) {
+
+		}
+		try {
+			branchService.create("MAIN.abc");
+			fail("Expected an exception.");
+		} catch (IllegalArgumentException e) {
+
+		}
+		branchService.create("MAIN/abc");
 	}
 
 	@Test

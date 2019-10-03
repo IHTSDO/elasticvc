@@ -70,6 +70,8 @@ public class BranchService {
 	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Map<String, String> metadata, Date specificBaseTimepoint) {
 		Assert.notNull(path, "Branch path can not be null.");
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
+		Assert.isTrue(path.startsWith("MAIN"), "The root branch must be 'MAIN'.");
+		Assert.isTrue(path.equals("MAIN") || path.startsWith("MAIN/"), "Branch paths start with 'MAIN' and are separated by forward slash. For example 'MAIN/projectA'.");
 
 		logger.debug("Attempting to create branch {}", path);
 		if (exists(path)) {
