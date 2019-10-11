@@ -1,5 +1,6 @@
 package io.kaicode.elasticvc.api;
 
+import com.google.common.collect.Lists;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
@@ -355,7 +356,9 @@ public class VersionControlHelper {
 			});
 		}
 		if (!toSave.isEmpty()) {
-			repository.saveAll(toSave);
+			for (List<T> partition : Lists.partition(toSave, 5_000)) {
+				repository.saveAll(partition);
+			}
 			logger.debug("Ended {} {} {}", toSave.size(), entityClass.getSimpleName(), toSave.stream().map(Entity::getInternalId).collect(Collectors.toList()));
 			toSave.clear();
 		}
