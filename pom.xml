@@ -18,7 +18,7 @@
 			- uses Elasticsearch 6.0.1
 			N.B. Remember to keep test version in sync in TestConfiguration.ELASTIC_SEARCH_VERSION
 		-->
-		<snomed-spring-data-elasticsearch.version>4.3.0</snomed-spring-data-elasticsearch.version>
+		<snomed-spring-data-elasticsearch.version>4.3.1-SNAPSHOT</snomed-spring-data-elasticsearch.version>
 
 		<github.global.server>github</github.global.server>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
