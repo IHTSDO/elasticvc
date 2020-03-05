@@ -162,9 +162,12 @@ public class VersionControlHelper {
 		Map<String, Set<String>> allEntityVersionsReplaced = null;
 		switch (contentSelection) {
 			case STANDARD_SELECTION:
-				// On this branch and started not ended
+				// On this branch and started and (not ended or ended later)
 				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
-				thisBranchShouldClause.mustNot(existsQuery("end"));
+				thisBranchShouldClause.must(boolQuery()
+					.should(boolQuery().mustNot(existsQuery("end")))
+					.should(rangeQuery("end").gt(timepoint.getTime())));
+
 				// Or any parent branch within time constraints
 				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
 				break;
