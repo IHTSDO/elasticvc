@@ -5,21 +5,17 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
 import io.kaicode.elasticvc.example.service.ConceptService;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = TestConfiguration.class)
-public class ConceptExampleTest {
+class ConceptExampleTest extends AbstractTest {
 
 	@Autowired
 	private ConceptService conceptService;
@@ -27,13 +23,13 @@ public class ConceptExampleTest {
 	@Autowired
 	private BranchService branchService;
 
-	@Test(expected = IllegalArgumentException.class)
-	public void testBranchDoesNotExist() {
-		conceptService.findConcept("1", "MAIN");
+	@Test
+	void testBranchDoesNotExist() {
+		Assertions.assertThrows(IllegalArgumentException.class, () -> conceptService.findConcept("1", "MAIN"));
 	}
 
 	@Test
-	public void testCreateFindUpdateOnMainBranch() {
+	void testCreateFindUpdateOnMainBranch() {
 		String branch = "MAIN";
 		branchService.create(branch);
 
@@ -56,7 +52,7 @@ public class ConceptExampleTest {
 	}
 
 	@Test
-	public void testCreateFindUpdateOnChildOfMainBranch() {
+	void testCreateFindUpdateOnChildOfMainBranch() {
 		String branch = "MAIN/A";
 		branchService.create("MAIN");
 		branchService.create(branch);
@@ -110,7 +106,7 @@ public class ConceptExampleTest {
 	}
 
 	@Test
-	public void testCommitRollback() {
+	void testCommitRollback() {
 		String branchPath = "MAIN/A";
 		branchService.create("MAIN");
 		branchService.create(branchPath);
@@ -164,8 +160,8 @@ public class ConceptExampleTest {
 				Collections.emptySet(), branchVersion.getVersionsReplaced().get("Concept"));
 	}
 
-	@After
-	public void tearDown() {
+	@AfterEach
+	void tearDown() {
 		branchService.deleteAll();
 		conceptService.deleteAll();
 	}

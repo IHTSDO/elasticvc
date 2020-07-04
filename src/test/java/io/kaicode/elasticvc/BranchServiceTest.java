@@ -3,31 +3,27 @@ package io.kaicode.elasticvc;
 import io.kaicode.elasticvc.api.BranchService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
-import org.junit.After;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import io.kaicode.elasticvc.repositories.BranchRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static io.kaicode.elasticvc.domain.Branch.BranchState.*;
 import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = TestConfiguration.class)
-public class BranchServiceTest {
+@Testcontainers
+public class BranchServiceTest extends AbstractTest {
 
 	@Autowired
 	private BranchService branchService;
 
 	@Autowired
-	private ElasticsearchTemplate elasticsearchTemplate;
+	private BranchRepository branchRepository;
 
 	@Test
 	public void testCreateFindBranches() {
@@ -119,12 +115,13 @@ public class BranchServiceTest {
 
 	@Test
 	public void testBranchState() {
-		elasticsearchTemplate.putMapping(Branch.class);
+		IndexOperations indexOps = elasticsearchRestTemplate.indexOps(Branch.class);
+		indexOps.putMapping(indexOps.createMapping(Branch.class));
 		Map<String, String> meta = new HashMap<>();
 		meta.put("test", "123");
 		branchService.create("MAIN", meta);
 
-		Map mapping = elasticsearchTemplate.getMapping(Branch.class);
+		Map mapping = indexOps.getMapping();
 		System.out.println(mapping);
 
 		Date mainACreationDate = branchService.create("MAIN/A").getCreation();
@@ -219,6 +216,19 @@ public class BranchServiceTest {
 	}
 
 	@Test
+	public void testVersionReplaced() {
+		Map<String, Set<String>> versionReplaced = new HashMap<>();
+		versionReplaced.put("Concept", new HashSet<>(Arrays.asList("123", "234")));
+		Branch main = branchService.create("MAIN");
+		main.setVersionsReplaced(versionReplaced);
+		branchRepository.save(main);
+		main = branchService.findLatest("MAIN");
+		// Add this test as the Spring data ES returns as List instead of Set for the map value
+		Set<String> replaced = main.getVersionsReplaced().get("Concept");
+		assertEquals(2, replaced.size());
+	}
+
+	@Test
 	public void testLoadInheritedMetadata() {
 		Map<String, String> metadataA = new HashMap<>();
 		metadataA.put("A", "A1");
@@ -253,7 +263,7 @@ public class BranchServiceTest {
 		}
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() {
 		branchService.deleteAll();
 	}

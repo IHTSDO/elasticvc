@@ -11,9 +11,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
-import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
-import org.springframework.data.elasticsearch.repository.ElasticsearchCrudRepository;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
@@ -35,24 +36,25 @@ public class ComponentService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
-	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchTemplate elasticsearchTemplate, Class<?>... persistentClass) {
+	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchRestTemplate elasticsearchRestTemplate, Class<?>... persistentClass) {
 		logger.info("Initialising indices");
 		Set<Class<?>> classes = Sets.newHashSet(persistentClass);
 		classes.add(Branch.class);
 		if (deleteExisting) {
 			logger.info("Deleting indices");
 			for (Class<?> aClass : classes) {
-				ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
-				logger.info("Deleting index {}", persistentEntity.getIndexName());
-				elasticsearchTemplate.deleteIndex(persistentEntity.getIndexName());
+				IndexCoordinates index = elasticsearchRestTemplate.getIndexCoordinatesFor(aClass);
+				logger.info("Deleting index {}", index.getIndexName());
+				elasticsearchRestTemplate.indexOps(index).delete();
 			}
 		}
 		for (Class<?> aClass : classes) {
-			ElasticsearchPersistentEntity persistentEntity = elasticsearchTemplate.getPersistentEntityFor(aClass);
-			if (!elasticsearchTemplate.indexExists(persistentEntity.getIndexName())) {
-				logger.info("Creating index {}", persistentEntity.getIndexName());
-				elasticsearchTemplate.createIndex(aClass);
-				elasticsearchTemplate.putMapping(aClass);
+			IndexCoordinates index = elasticsearchRestTemplate.getIndexCoordinatesFor(aClass);
+			IndexOperations indexOperations = elasticsearchRestTemplate.indexOps(index);
+			if (!indexOperations.exists()) {
+				logger.info("Creating index {}", index.getIndexName());
+				indexOperations.create();
+				indexOperations.putMapping(indexOperations.createMapping(aClass));
 			}
 		}
 	}
@@ -62,8 +64,8 @@ public class ComponentService {
 	 * Saves components within commit.
 	 * @return The saved components with updated metadata not including those which were deleted.
 	 */
-	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchCrudRepository<C, String> repository) {
-		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchCrudRepository.class, repository.getClass());
+	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchRepository<C, String> repository) {
+		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchRepository.class, repository.getClass());
 		Class<C> componentClass = (Class<C>) classes[0];
 		commit.addDomainEntityClass(componentClass);
 		final List<C> changedOrDeletedComponents = components.stream().filter(component -> component.isChanged() || component.isDeleted()).collect(Collectors.toList());

@@ -5,10 +5,8 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.repositories.BranchRepository;
-import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.script.Script;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
@@ -16,9 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.core.*;
 import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.util.CloseableIterator;
 import org.springframework.stereotype.Service;
@@ -35,11 +34,12 @@ public class BranchService {
 
 	public static final String LOCK_METADATA_KEY = "lock";
 
+
 	@Autowired
 	private BranchRepository branchRepository;
 
 	@Autowired
-	private ElasticsearchTemplate elasticsearchTemplate;
+	private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
 	private final List<CommitListener> commitListeners;
 
@@ -106,7 +106,7 @@ public class BranchService {
 	}
 
 	public boolean exists(String path) {
-		return elasticsearchTemplate.count(getBranchQuery(path, false), Branch.class) > 0;
+		return elasticsearchRestTemplate.count(getBranchQuery(path, false), Branch.class) > 0;
 	}
 
 	public void deleteAll() {
@@ -115,8 +115,8 @@ public class BranchService {
 
 	public Branch findLatest(String path) {
 		NativeSearchQuery query = getBranchQuery(path, true);
-		final List<Branch> branches = elasticsearchTemplate.queryForList(query, Branch.class);
-
+		SearchHits<Branch> results = elasticsearchRestTemplate.search(query, Branch.class);
+		final List<Branch> branches = results.stream().map(r -> r.getContent()).collect(Collectors.toList());
 		Branch branch = null;
 		Branch parentBranch = null;
 
@@ -143,7 +143,6 @@ public class BranchService {
 		if (parentBranch == null) {
 			return illegalState("Parent branch of " + path + " not found.");
 		}
-
 		branch.updateState(parentBranch.getHead());
 		return branch;
 	}
@@ -197,12 +196,13 @@ public class BranchService {
 	}
 
 	public Branch findFirstVersionOrThrow(String path) {
-		List<Branch> branchVersions = elasticsearchTemplate.queryForList(
+		List<Branch> branchVersions = elasticsearchRestTemplate.search(
 				new NativeSearchQueryBuilder()
 						.withQuery(termQuery("path", path))
 						.withSort(SortBuilders.fieldSort("start"))
 						.withPageable(PageRequest.of(0, 1))
-						.build(), Branch.class);
+						.build(), Branch.class)
+				.stream().map(SearchHit::getContent).collect(Collectors.toList());
 		if (branchVersions.isEmpty()) {
 			throw new BranchNotFoundException("Branch '" + path + "' does not exist.");
 		}
@@ -210,27 +210,31 @@ public class BranchService {
 	}
 
 	public Page<Branch> findAllVersions(String path, Pageable pageable) {
-		return elasticsearchTemplate.queryForPage(
+		SearchHits<Branch> results = elasticsearchRestTemplate.search(
 				new NativeSearchQueryBuilder()
 						.withQuery(termQuery("path", path))
 						.withSort(SortBuilders.fieldSort("start"))
 						.withPageable(pageable)
 						.build(), Branch.class);
+
+		return new PageImpl<>(results.get().map(hit -> hit.getContent()).collect(Collectors.toList()), pageable, results.getTotalHits());
 	}
 
 	public Page<Branch> findAllVersionsAfterTimestamp(String path, Date timestamp, Pageable pageable) {
-		return elasticsearchTemplate.queryForPage(
+		SearchHits<Branch> searchHits = elasticsearchRestTemplate.search(
 				new NativeSearchQueryBuilder()
 						.withQuery(boolQuery()
 								.must(termQuery("path", path))
 								.must(rangeQuery("start").gt(timestamp.getTime())))
 						.withSort(SortBuilders.fieldSort("start"))
 						.withPageable(pageable)
-						.build(), Branch.class);
+						.build(), Branch.class, elasticsearchRestTemplate.getIndexCoordinatesFor(Branch.class));
+		return new PageImpl<>(searchHits.stream().map(hit -> hit.getContent()).collect(Collectors.toList()), pageable, searchHits.getTotalHits());
+
 	}
 
 	public Branch findAtTimepointOrThrow(String path, Date timepoint) {
-		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+		SearchHits<Branch> response = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(boolQuery()
 						.must(termQuery("path", path))
 						.must(rangeQuery("base").lte(timepoint.getTime()))
@@ -239,14 +243,19 @@ public class BranchService {
 								.should(rangeQuery("end").gt(timepoint.getTime()))))
 				.withSort(SortBuilders.fieldSort("start"))
 				.withPageable(PageRequest.of(0, 1))
-				.build(), Branch.class);
+				.build(), Branch.class, elasticsearchRestTemplate.getIndexCoordinatesFor(Branch.class));
+
+		final List<Branch> branches = new ArrayList<>();
+		response.stream().forEach(r -> branches.add(r.getContent()));
 		if (branches.isEmpty()) {
-			final List<Branch> last30 = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+			SearchHits<Branch> mostRecentSearch = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 					.withQuery(boolQuery()
 							.must(termQuery("path", path)))
 					.withSort(SortBuilders.fieldSort("start").order(SortOrder.DESC))
 					.withPageable(PageRequest.of(0, 30))
-					.build(), Branch.class);
+					.build(), Branch.class, elasticsearchRestTemplate.getIndexCoordinatesFor(Branch.class));
+			final List<Branch> last30 = new ArrayList<>();
+			mostRecentSearch.stream().forEach(result -> last30.add(result.getContent()));
 			logger.info("Branch version missing. Logging last 30 versions:");
 			for (Branch branchVersion : last30) {
 				logger.info("- Branch version {}", branchVersion);
@@ -258,11 +267,14 @@ public class BranchService {
 	}
 
 	public List<Branch> findAll() {
-		return elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+		SearchHits<Branch> searchHits = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")))
 				.withSort(new FieldSortBuilder("path"))
 				.withPageable(PageRequest.of(0, 10000))
 				.build(), Branch.class);
+		List<Branch> all = new ArrayList<>();
+		searchHits.forEach(result -> all.add(result.getContent()));
+		return all;
 	}
 
 	public List<Branch> findChildren(String path) {
@@ -270,14 +282,16 @@ public class BranchService {
 	}
 
 	public List<Branch> findChildren(String path, boolean immediateChildren) {
-		List<Branch> children = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+		SearchHits<Branch> results = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(new BoolQueryBuilder().mustNot(existsQuery("end")).must(prefixQuery("path", path + "/")))
 				.withSort(new FieldSortBuilder("path"))
 				.build(), Branch.class);
 
+		final List<Branch> children = new ArrayList<>();
+		results.forEach(r -> children.add(r.getContent()));
 		if (immediateChildren) {
 			Branch parent = findBranchOrThrow(path);
-			children = children.stream()
+			return children.stream()
 					.filter(child -> parent.isParent(child))
 					.collect(Collectors.toList());
 		}
@@ -451,13 +465,13 @@ public class BranchService {
 		logger.info("Rolling back commit on {} started at {}", commit.getBranch().getPath(), commit.getTimepoint().getTime());
 		// On all indexes touched: delete documents with the path and timepoint of the commit
 		// then remove the write lock from the branch.
-		DeleteQuery deleteQuery = new DeleteQuery();
-		deleteQuery.setQuery(new BoolQueryBuilder()
+		Query query = new NativeSearchQueryBuilder().withQuery(boolQuery()
 				.must(termQuery("path", commit.getBranch().getPath()))
 				.must(termQuery("start", commit.getTimepoint().getTime()))
-		);
+		).build();
+
 		for (Class domainEntityClass : commit.getDomainEntityClasses()) {
-			elasticsearchTemplate.delete(deleteQuery, domainEntityClass);
+			elasticsearchRestTemplate.delete(query, domainEntityClass, elasticsearchRestTemplate.getIndexCoordinatesFor(domainEntityClass));
 		}
 
 		Branch branch = commit.getBranch();
@@ -487,13 +501,12 @@ public class BranchService {
 		lockBranch(previousBranchVersion, getLockMessageOrNull(branchVersion));
 
 		logger.info("Deleting documents on {} started at {}.", path, timestamp);
-		DeleteQuery deleteQuery = new DeleteQuery();
-		deleteQuery.setQuery(new BoolQueryBuilder()
+		Query deleteQuery = new NativeSearchQueryBuilder().withQuery(boolQuery()
 				.must(termQuery("path", path))
-				.must(termQuery("start", timestamp)));
+				.must(termQuery("start", timestamp))).build();
 		for (Class<? extends DomainEntity> domainEntityClass : domainTypes) {
-			elasticsearchTemplate.delete(deleteQuery, domainEntityClass);
-			elasticsearchTemplate.refresh(domainEntityClass);
+			elasticsearchRestTemplate.delete(deleteQuery, domainEntityClass, elasticsearchRestTemplate.getIndexCoordinatesFor(domainEntityClass));
+			elasticsearchRestTemplate.indexOps(domainEntityClass).refresh();
 		}
 
 		logger.info("Clearing end time for documents on {} ended at {}.", timestamp, path);
@@ -508,29 +521,25 @@ public class BranchService {
 							.must(termQuery("path", path)))
 					.withFields("internalId")
 					.withPageable(LARGE_PAGE).build();
-			try (final CloseableIterator<? extends DomainEntity> endedDocs = elasticsearchTemplate.stream(endedDocumentQuery, type)) {
+			try (final CloseableIterator<? extends DomainEntity> endedDocs = elasticsearchRestTemplate.stream(endedDocumentQuery, type, elasticsearchRestTemplate.getIndexCoordinatesFor(type))) {
 				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getInternalId()));
 			}
 
 			// Clear end dates
 			List<UpdateQuery> updateQueries = new ArrayList<>();
 			for (String internalId : endedDocumentIds) {
-				UpdateRequest updateRequest = new UpdateRequest();
-				updateRequest.script(new Script("ctx._source.remove('end')"));
-
-				updateQueries.add(new UpdateQueryBuilder()
-						.withClass(type)
-						.withId(internalId)
-						.withUpdateRequest(updateRequest)
-						.build());
+				UpdateQuery updateQuery = UpdateQuery.builder(internalId)
+						.withScript("ctx._source.remove('end')")
+						.build();
+				updateQueries.add(updateQuery);
 			}
 			Iterators.partition(updateQueries.iterator(), 1_000).forEachRemaining(updateQueryBatch -> {
 				if (!updateQueryBatch.isEmpty()) {
-					elasticsearchTemplate.bulkUpdate(updateQueryBatch);
+					elasticsearchRestTemplate.bulkUpdate(updateQueryBatch, elasticsearchRestTemplate.getIndexCoordinatesFor(type));
 				}
 			});
 
-			elasticsearchTemplate.refresh(type);
+			elasticsearchRestTemplate.indexOps(type).refresh();
 			logger.info("{} ended documents restored for type {}.", endedDocumentIds.size(), type.getSimpleName());
 		}
 
@@ -554,14 +563,15 @@ public class BranchService {
 	}
 
 	public void unlock(String path) {
-		final List<Branch> branches = elasticsearchTemplate.queryForList(new NativeSearchQueryBuilder()
+		final List<Branch> branches = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(
 					new BoolQueryBuilder()
 							.must(termQuery("path", path))
 							.mustNot(existsQuery("end"))
 					)
 				.withPageable(PageRequest.of(0, 1))
-				.build(), Branch.class);
+				.build(), Branch.class)
+				.stream().map(result -> result.getContent()).collect(Collectors.toList());
 
 		if (!branches.isEmpty()) {
 			final Branch branch = branches.get(0);
