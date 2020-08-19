@@ -1,5 +1,7 @@
 package io.kaicode.elasticvc.domain;
 
+import io.kaicode.elasticvc.api.MapUtil;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
@@ -15,16 +17,16 @@ public class Branch extends Entity {
 	 */
 	public static final String MAIN = "MAIN";
 
-	@Field(type = FieldType.Date)
+	@Field(type = FieldType.Long)
 	private Date base;
 
-	@Field(type = FieldType.Date)
+	@Field(type = FieldType.Long)
 	private Date head;
 
-	@Field(type = FieldType.Date)
+	@Field(type = FieldType.Long)
 	private Date creation;
 
-	@Field(type = FieldType.Date)
+	@Field(type = FieldType.Long)
 	private Date lastPromotion;
 
 	@Field(type = FieldType.Boolean)
@@ -36,22 +38,24 @@ public class Branch extends Entity {
 	/**
 	 * Map of classes and internal ids of entities visible on ancestor branches which have been replaced or deleted on this branch
 	 */
-	private Map<String, Set<String>> versionsReplaced;
+	private Map<String, Collection<String>> versionsReplaced;
 
 	@Field(type = FieldType.Object)
 	private Map<String, String> metadataInternal;
 
+	@Transient
 	private BranchState state;
-
 
 	public enum BranchState {
 		UP_TO_DATE, FORWARD, BEHIND, DIVERGED;
 
 	}
+
 	public Branch() {
 		head = new Date();
 		versionsReplaced = new HashMap<>();
 	}
+
 	public Branch(String path) {
 		this();
 		setPath(path);
@@ -94,7 +98,7 @@ public class Branch extends Entity {
 
 	public Set<String> getVersionsReplaced(Class<? extends DomainEntity> entityClass) {
 		if (notMAIN()) {
-			return versionsReplaced.getOrDefault(entityClass.getSimpleName(), Collections.emptySet());
+			return new HashSet<>(versionsReplaced.getOrDefault(entityClass.getSimpleName(), Collections.emptySet()));
 		} else {
 			return Collections.emptySet();
 		}
@@ -165,7 +169,7 @@ public class Branch extends Entity {
 	}
 
 	public Map<String, Set<String>> getVersionsReplaced() {
-		return versionsReplaced;
+		return MapUtil.convertToSet(versionsReplaced);
 	}
 
 	public Map<String, Integer> getVersionsReplacedCounts() {
@@ -177,7 +181,7 @@ public class Branch extends Entity {
 	}
 
 	public void setVersionsReplaced(Map<String, Set<String>> versionsReplaced) {
-		this.versionsReplaced = versionsReplaced;
+		this.versionsReplaced = MapUtil.convertToCollection(versionsReplaced);
 	}
 
 	public BranchState getState() {

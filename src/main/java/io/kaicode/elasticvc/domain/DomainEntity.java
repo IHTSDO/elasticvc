@@ -1,10 +1,10 @@
 package io.kaicode.elasticvc.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.springframework.data.annotation.Transient;
 
 public abstract class DomainEntity<C> extends Entity {
 
-	@JsonIgnore
+	@Transient
 	private boolean changed;
 
 	public abstract String getId();

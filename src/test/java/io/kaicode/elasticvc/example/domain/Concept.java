@@ -4,7 +4,7 @@ import io.kaicode.elasticvc.domain.DomainEntity;
 import org.springframework.data.elasticsearch.annotations.Document;
 
 // Example domain entity
-@Document(type = "concept", indexName = "snomed", shards = 8)
+@Document(indexName = "concept")
 public class Concept extends DomainEntity<Concept>{
 
 	// Must have an identifier field with a name other than 'id'

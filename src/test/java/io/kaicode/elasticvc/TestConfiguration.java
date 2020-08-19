@@ -1,75 +1,98 @@
 package io.kaicode.elasticvc;
 
 import io.kaicode.elasticvc.api.ComponentService;
-import io.kaicode.elasticvc.api.VersionControlHelper;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.example.domain.Concept;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.elasticsearch.client.RestHighLevelClient;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
-import org.springframework.data.elasticsearch.rest.ElasticsearchRestClient;
-import pl.allegro.tech.embeddedelasticsearch.EmbeddedElastic;
-import pl.allegro.tech.embeddedelasticsearch.PopularProperties;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
+import org.springframework.data.convert.WritingConverter;
+import org.springframework.data.elasticsearch.client.ClientConfiguration;
+import org.springframework.data.elasticsearch.client.RestClients;
+import org.springframework.data.elasticsearch.config.AbstractElasticsearchConfiguration;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.convert.ElasticsearchCustomConversions;
+import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
+import org.testcontainers.elasticsearch.ElasticsearchContainer;
+import org.testcontainers.junit.jupiter.Container;
 
-import javax.annotation.PreDestroy;
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
+import javax.annotation.PostConstruct;
+import java.util.Arrays;
+import java.util.Date;
 
 @SpringBootApplication
-public class TestConfiguration {
+@EnableElasticsearchRepositories(basePackages = "io.kaicode.elasticvc")
+public class TestConfiguration extends AbstractElasticsearchConfiguration {
 
-	private static final String ELASTIC_SEARCH_VERSION = "6.0.1";
+	// Current version supported by AWS is 7.7.0
+	private static final String ELASTIC_SEARCH_DOCKER = "elasticsearch:7.7.0";
 
-	private static EmbeddedElastic standaloneTestElasticsearchServer;
+	@Container
+	private static ElasticsearchContainer elasticsearchContainer;
 
-	@Bean
-	public ElasticsearchTemplate elasticsearchTemplate() {
-
-		// Create and start test server
-		createStandaloneTestInstance();
-
-		// Connect to standalone instance
-		ElasticsearchRestClient client = new ElasticsearchRestClient(new HashMap<>(), "http://localhost:9935");
-		return new ElasticsearchTemplate(client);
+	static {
+		elasticsearchContainer = new SnowstormElasticsearchContainer();
+		elasticsearchContainer.start();
 	}
 
-	@Bean
-	public ComponentService componentService() {
+	@PostConstruct
+	public void  initComponentService() {
 		ComponentService.initialiseIndexAndMappingForPersistentClasses(
 				true,
-				elasticsearchTemplate(),
+				elasticsearchRestTemplate(),
 				Branch.class,
 				Concept.class
 		);
-		return new ComponentService();
 	}
 
-	/**
-	 * Downloads Elasticsearch and starts a standalone instance from temp directory.
-	 * The instance shuts itself down when this JVM closes.
-	 */
-	private void createStandaloneTestInstance() {
-		try {
-			File downloadDir = null;
-			if (System.getProperty("user.home") != null) {
-				downloadDir = new File(new File(System.getProperty("user.home"), "tmp"), "embedded-elasticsearch-download-cache");
-				downloadDir.mkdirs();
-			}
-			standaloneTestElasticsearchServer = EmbeddedElastic.builder()
-					.withElasticVersion(ELASTIC_SEARCH_VERSION)
-					.withStartTimeout(30, TimeUnit.SECONDS)
-					.withSetting(PopularProperties.CLUSTER_NAME, "integration-test-cluster")
-					.withSetting(PopularProperties.HTTP_PORT, 9935)
-					.withDownloadDirectory(downloadDir)
-					.build()
-					.start();
-		} catch (IOException | InterruptedException e) {
-			throw new RuntimeException("Failed to start standalone test server.");
+	static ElasticsearchContainer getElasticsearchContainerInstance() {
+		return elasticsearchContainer;
+	}
+
+	@Bean(name = {"elasticsearchTemplate", "elasticsearchRestTemplate"})
+	public ElasticsearchRestTemplate elasticsearchRestTemplate() {
+		return new ElasticsearchRestTemplate(elasticsearchClient());
+	}
+
+	@Override
+	public RestHighLevelClient elasticsearchClient() {
+		return RestClients.create(ClientConfiguration.builder()
+				.connectedTo(elasticsearchContainer.getHttpHostAddress()).build()).rest();
+	}
+
+	public static class SnowstormElasticsearchContainer extends ElasticsearchContainer {
+		public SnowstormElasticsearchContainer() {
+			super(ELASTIC_SEARCH_DOCKER);
+			// these are mapped ports used by the test container the actual ports used might be different
+			this.addFixedExposedPort(9235, 9235);
+			this.addFixedExposedPort(9330, 9330);
+			this.addEnv("cluster.name", "integration-test-cluster");
 		}
-		standaloneTestElasticsearchServer.deleteIndices();
 	}
 
+	@Bean
+	@Override
+	public ElasticsearchCustomConversions elasticsearchCustomConversions() {
+		return new ElasticsearchCustomConversions(
+				Arrays.asList(new DateToLong(), new LongToDate()));
+	}
+
+	@WritingConverter
+	static class DateToLong implements Converter<Date, Long> {
+
+		@Override
+		public Long convert(Date date) {
+			return date.getTime();
+		}
+	}
+
+	@ReadingConverter
+	static class LongToDate implements Converter<Long, Date> {
+		@Override
+		public Date convert(Long dateInMillis) {
+			return new Date(dateInMillis);
+		}
+	}
 }
