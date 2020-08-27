@@ -2,6 +2,7 @@ package io.kaicode.elasticvc.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
@@ -14,19 +15,19 @@ public class Entity {
 	public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT_STRING);
 
 	@Id
-	@Field(type = FieldType.keyword)
+	@Field(type = FieldType.Keyword)
 	private String internalId;
 
-	@Field(type = FieldType.keyword)
+	@Field(type = FieldType.Keyword)
 	private String path;
 
-	@Field(type = FieldType.Date)
+	@Field(type = FieldType.Long)
 	private Date start;
 
-	@Field(type = FieldType.Date)
+	@Field(type = FieldType.Long)
 	private Date end;
 
-	@JsonIgnore
+	@Transient
 	private boolean deleted;
 
 	public void markDeleted() {

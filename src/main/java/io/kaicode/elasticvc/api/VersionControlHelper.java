@@ -11,11 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.SearchHitsIterator;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
-import org.springframework.data.elasticsearch.repository.ElasticsearchCrudRepository;
-import org.springframework.data.util.CloseableIterator;
+import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
@@ -34,7 +34,7 @@ public class VersionControlHelper {
 	private BranchService branchService;
 
 	@Autowired
-	private ElasticsearchOperations elasticsearchTemplate;
+	private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -132,8 +132,8 @@ public class VersionControlHelper {
 						boolQuery()
 								.must(termQuery("path", startBranchTimepoint.getPath()))
 								.must(boolQuery()
-										.should(rangeQuery("start").gte(startDate).lte(endDate))
-										.should(rangeQuery("end").gte(startDate).lte(endDate))
+										.should(rangeQuery("start").gte(startDate.getTime()).lte(endDate.getTime()))
+										.should(rangeQuery("end").gte(startDate.getTime()).lte(endDate.getTime()))
 								)
 						);
 			}
@@ -150,7 +150,6 @@ public class VersionControlHelper {
 	}
 
 	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit) {
-
 		final BoolQueryBuilder branchCriteria = boolQuery();
 		// When adding top level clauses to the branchCriteria BoolQueryBuilder we must either use all 'should' clauses or all 'must' clauses.
 		// If any 'must' clauses are given then the 'should' clauses do not have to match in Elasticsearch.
@@ -238,15 +237,15 @@ public class VersionControlHelper {
 			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH: {
 					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
 				thisBranchShouldClause.must(boolQuery()
-							.should(rangeQuery("start").gte(startPoint))
-							.should(rangeQuery("end").gte(startPoint)));
+							.should(rangeQuery("start").gte(startPoint.getTime()))
+							.should(rangeQuery("end").gte(startPoint.getTime())));
 				}
 				break;
 
 			case UNPROMOTED_CHANGES_ON_THIS_BRANCH: {
 					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
 				thisBranchShouldClause
-							.must(rangeQuery("start").gte(startPoint))
+							.must(rangeQuery("start").gte(startPoint.getTime()))
 							.mustNot(existsQuery("end"));
 				}
 				break;
@@ -290,7 +289,7 @@ public class VersionControlHelper {
 		}
 	}
 
-	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchCrudRepository repository) {
+	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchRepository repository) {
 		// End versions of the entity on this path by setting end date
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
 
@@ -311,9 +310,9 @@ public class VersionControlHelper {
 				.build();
 
 		Set<String> versionsReplaced = new HashSet<>();
-		try (final CloseableIterator<T> replacedVersions = elasticsearchTemplate.stream(query2, entityClass)) {
+		try (final SearchHitsIterator<T> replacedVersions = elasticsearchRestTemplate.searchForStream(query2, entityClass)) {
 			replacedVersions.forEachRemaining(version -> {
-				versionsReplaced.add(version.getInternalId());
+				versionsReplaced.add(version.getContent().getInternalId());
 			});
 		}
 		commit.addVersionsReplaced(versionsReplaced, entityClass);
@@ -321,12 +320,12 @@ public class VersionControlHelper {
 		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
 	}
 
-	public <T extends DomainEntity> void endAllVersionsOnThisBranch(Class<T> entityClass, @Nullable QueryBuilder selectionClause, Commit commit, ElasticsearchCrudRepository repository) {
+	public <T extends DomainEntity> void endAllVersionsOnThisBranch(Class<T> entityClass, @Nullable QueryBuilder selectionClause, Commit commit, ElasticsearchRepository repository) {
 		endOldVersionsOnThisBranch(entityClass, null, null, selectionClause, commit, repository);
 	}
 
 	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Class<T> entityClass, Collection<?> ids, String idField, QueryBuilder selectionClause,
-			Commit commit, ElasticsearchCrudRepository repository) {
+			Commit commit, ElasticsearchRepository repository) {
 
 		if (ids != null && ids.isEmpty()) {
 			return;
@@ -352,10 +351,10 @@ public class VersionControlHelper {
 				.build();
 
 		List<T> toSave = new ArrayList<>();
-		try (final CloseableIterator<T> localVersionsToEnd = elasticsearchTemplate.stream(query, entityClass)) {
+		try (final SearchHitsIterator<T> localVersionsToEnd = elasticsearchRestTemplate.searchForStream(query, entityClass)) {
 			localVersionsToEnd.forEachRemaining(version -> {
-				version.setEnd(commit.getTimepoint());
-				toSave.add(version);
+				version.getContent().setEnd(commit.getTimepoint());
+				toSave.add(version.getContent());
 			});
 		}
 		if (!toSave.isEmpty()) {

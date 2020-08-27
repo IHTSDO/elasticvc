@@ -8,10 +8,13 @@ import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -31,7 +34,7 @@ public class ConceptService extends ComponentService {
 
 	// Used to search
 	@Autowired
-	private ElasticsearchOperations elasticsearchTemplate;
+	private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
 	// Example domain entity repository
 	@Autowired
@@ -64,7 +67,9 @@ public class ConceptService extends ComponentService {
 						// Also add any other required clauses
 						.must(termQuery(Concept.FIELD_ID, id))
 				).build();
-		List<Concept> concepts = elasticsearchTemplate.queryForList(nativeSearchQuery, Concept.class);
+		List<Concept> concepts = new ArrayList<>();
+		SearchHits<Concept> response = elasticsearchRestTemplate.search(nativeSearchQuery, Concept.class, elasticsearchRestTemplate.getIndexCoordinatesFor(Concept.class));
+		response.stream().forEach(hit -> concepts.add(hit.getContent()));
 		return !concepts.isEmpty() ? concepts.get(0) : null;
 	}
 

@@ -11,6 +11,7 @@ public class Commit implements AutoCloseable {
 	private final Branch branch;
 
 	private final Date timepoint;
+
 	private Date rebasePreviousBase;
 
 	/**
