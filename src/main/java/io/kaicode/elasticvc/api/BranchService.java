@@ -5,6 +5,7 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.repositories.BranchRepository;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
@@ -391,9 +392,9 @@ public class BranchService {
 			for (CommitListener commitListener : commitListeners) {
 				commitListener.preCommitCompletion(commit);
 			}
-		} catch (IllegalStateException e) {
-			logger.error("Commit commitListener threw IllegalStateException, rolling back commit {} on branch {}",
-					commit.getTimepoint().getTime(), commit.getBranch().getPath(), e);
+		} catch (IllegalStateException | ElasticsearchException e) {
+			logger.error("Commit commitListener threw {}, rolling back commit {} on branch {}",
+					e.getClass().getSimpleName(), commit.getTimepoint().getTime(), commit.getBranch().getPath(), e);
 
 			rollbackCommit(commit);
 			throw e;
