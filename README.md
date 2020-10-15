@@ -23,4 +23,6 @@ TODO
 TODO
 
 ## Building the project
-Run a maven build. A Docker daemon must be installed running because the integration tests use a small container to host Elasticsearch.
+Run a maven build. 
+
+Unit tests require Docker to be running because a small Elasticsearch container is used.
