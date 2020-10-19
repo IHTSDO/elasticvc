@@ -5,6 +5,7 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.repositories.BranchRepository;
+import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
@@ -464,16 +465,10 @@ public class BranchService {
 
 	private void rollbackCommit(Commit commit) {
 		logger.info("Rolling back commit on {} started at {}", commit.getBranch().getPath(), commit.getTimepoint().getTime());
-		// On all indexes touched: delete documents with the path and timepoint of the commit
-		// then remove the write lock from the branch.
-		Query query = new NativeSearchQueryBuilder().withQuery(boolQuery()
-				.must(termQuery("path", commit.getBranch().getPath()))
-				.must(termQuery("start", commit.getTimepoint().getTime()))
-		).build();
 
-		for (Class domainEntityClass : commit.getDomainEntityClasses()) {
-			elasticsearchRestTemplate.delete(query, domainEntityClass, elasticsearchRestTemplate.getIndexCoordinatesFor(domainEntityClass));
-		}
+		@SuppressWarnings("unchecked")
+		Set<Class<? extends DomainEntity>> domainEntityClasses = commit.getDomainEntityClasses().stream().map(clazz -> (Class<? extends DomainEntity>) clazz).collect(Collectors.toSet());
+		doContentRollback(commit.getBranch().getPath(), commit.getTimepoint().getTime(), domainEntityClasses);
 
 		Branch branch = commit.getBranch();
 		if (commit.isRebase()) {
@@ -501,6 +496,16 @@ public class BranchService {
 		// (Also saves the branch version)
 		lockBranch(previousBranchVersion, getLockMessageOrNull(branchVersion));
 
+		doContentRollback(path, timestamp, domainTypes);
+
+		if (!lockedInitially) {
+			unlock(path);
+		}
+
+		logger.info("Completed rollback of commit {} on {}.", timestamp, path);
+	}
+
+	private void doContentRollback(String path, long timestamp, Collection<Class<? extends DomainEntity>> domainTypes) {
 		logger.info("Deleting documents on {} started at {}.", path, timestamp);
 		Query deleteQuery = new NativeSearchQueryBuilder().withQuery(boolQuery()
 				.must(termQuery("path", path))
@@ -511,9 +516,7 @@ public class BranchService {
 		}
 
 		logger.info("Clearing end time for documents on {} ended at {}.", timestamp, path);
-
 		for (Class<? extends DomainEntity> type : domainTypes) {
-
 			// Find ended documents
 			Set<String> endedDocumentIds = new HashSet<>();
 			NativeSearchQuery endedDocumentQuery = new NativeSearchQueryBuilder()
@@ -539,16 +542,11 @@ public class BranchService {
 					elasticsearchRestTemplate.bulkUpdate(updateQueryBatch, elasticsearchRestTemplate.getIndexCoordinatesFor(type));
 				}
 			});
-
 			elasticsearchRestTemplate.indexOps(type).refresh();
-			logger.info("{} ended documents restored for type {}.", endedDocumentIds.size(), type.getSimpleName());
+			if (!endedDocumentIds.isEmpty()) {
+				logger.info("{} ended documents restored for type {}.", endedDocumentIds.size(), type.getSimpleName());
+			}
 		}
-
-		if (!lockedInitially) {
-			unlock(path);
-		}
-
-		logger.info("Completed rollback of commit {} on {}.", timestamp, path);
 	}
 
 	public String getLockMessageOrNull(Branch branchVersion) {
