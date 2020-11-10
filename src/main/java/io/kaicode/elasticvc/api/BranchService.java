@@ -314,12 +314,16 @@ public class BranchService {
 
 	private Commit openCommit(String branchPath, String mergeSourceBranchPath, Commit.CommitType commitType, String sourceBranchLockMetadata, String targetBranchLockMetadata) {
 		synchronized (branchLockSyncObject) {
+			Branch sourceBranch = null;
 			if (commitType == Commit.CommitType.PROMOTION) {
 				// Lock source branch as well as target
-				lockBranch(mergeSourceBranchPath, sourceBranchLockMetadata);
+				sourceBranch = lockBranch(mergeSourceBranchPath, sourceBranchLockMetadata);
 			}
 			Branch branch = lockBranch(branchPath, targetBranchLockMetadata);
 			Commit commit = new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+			if (commitType == Commit.CommitType.PROMOTION) {
+				commit.setVersionsReplacedForPromotion(sourceBranch.getVersionsReplaced());
+			}
 			logger.info("Open commit on {} at {}", branchPath, commit.getTimepoint().getTime());
 			return commit;
 		}
@@ -438,7 +442,7 @@ public class BranchService {
 			oldSourceBranch.setEnd(timepoint);
 			clearLock(oldSourceBranch);
 			if (!PathUtil.isRoot(path)) {
-				newBranchTimespan.addVersionsReplaced(oldSourceBranch.getVersionsReplaced());
+				newBranchTimespan.addVersionsReplaced(commit.getVersionsReplacedForPromotion());
 			} else {
 				// Root branch has no need for versions replaced collection.
 				newBranchTimespan.getVersionsReplaced().clear();

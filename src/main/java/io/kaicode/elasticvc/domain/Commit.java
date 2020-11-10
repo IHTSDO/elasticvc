@@ -20,6 +20,8 @@ public class Commit implements AutoCloseable {
 	 */
 	private final Map<String, Set<String>> entityVersionsReplaced;
 
+	private Map<String, Set<String>> versionsReplacedForPromotion;
+
 	/**
 	 * Transient set of entity ids of the entities which have been deleted during this commit,
 	 * regardless of if they are visible on the parent branch.
@@ -89,6 +91,14 @@ public class Commit implements AutoCloseable {
 	public Map<String, Set<String>> getEntityVersionsReplacedIncludingFromBranch() {
 		Map<String, Set<String>> versions = MapUtil.addAll(entityVersionsReplaced, new HashMap<>());
 		return MapUtil.addAll(branch.getVersionsReplaced(), versions);
+	}
+
+	public Map<String, Set<String>> getVersionsReplacedForPromotion() {
+		return versionsReplacedForPromotion;
+	}
+
+	public void setVersionsReplacedForPromotion(Map<String, Set<String>> versionsReplacedForPromotion) {
+		this.versionsReplacedForPromotion = new ConcurrentHashMap<>(versionsReplacedForPromotion);
 	}
 
 	public Set<String> getEntitiesDeleted() {
