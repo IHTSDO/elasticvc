@@ -5,7 +5,6 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.repositories.BranchRepository;
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
@@ -108,15 +107,15 @@ public class BranchService {
 	}
 
 	public boolean exists(String path) {
-		return elasticsearchRestTemplate.count(getBranchQuery(path, false), Branch.class) > 0;
+		return elasticsearchRestTemplate.count(getBranchQuery(path, false, false), Branch.class) > 0;
 	}
 
 	public void deleteAll() {
 		branchRepository.deleteAll();
 	}
 
-	public Branch findLatest(String path) {
-		NativeSearchQuery query = getBranchQuery(path, true);
+	public Branch findLatest(String path, boolean includeEndedBranches) {
+		NativeSearchQuery query = getBranchQuery(path, true, includeEndedBranches);
 		SearchHits<Branch> results = elasticsearchRestTemplate.search(query, Branch.class);
 		final List<Branch> branches = results.stream().map(r -> r.getContent()).collect(Collectors.toList());
 		Branch branch = null;
@@ -124,10 +123,16 @@ public class BranchService {
 
 		for (Branch b : branches) {
 			if (b.getPath().equals(path)) {
-				if (branch != null) {
+				if (includeEndedBranches) {
+					if (branch == null || b.getStart().after(branch.getStart())) {
+						branch = b;
+					}
+				} else if (branch != null) {
+					//If we're not considering ended branches, there should only be one not-ended branch
 					return illegalState("There should not be more than one version of branch " + path + " with no end date.");
+				} else {
+					branch = b;
 				}
-				branch = b;
 			} else {
 				parentBranch = b;
 			}
@@ -148,8 +153,12 @@ public class BranchService {
 		branch.updateState(parentBranch.getHead());
 		return branch;
 	}
+	
+	public Branch findLatest(String path) {
+		return findLatest(path, false);  //Do not consider ended branches by default
+	}
 
-	private NativeSearchQuery getBranchQuery(String path, boolean includeParent) {
+	private NativeSearchQuery getBranchQuery(String path, boolean includeParent, boolean includeEnded) {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
 
 		final BoolQueryBuilder pathClauses = boolQuery().should(termQuery("path", path));
@@ -158,11 +167,11 @@ public class BranchService {
 			pathClauses.should(termQuery("path", PathUtil.getParentPath(path)));
 		}
 
-		return new NativeSearchQueryBuilder().withQuery(
-				new BoolQueryBuilder()
-						.must(pathClauses)
-						.mustNot(existsQuery("end"))
-		).build();
+		BoolQueryBuilder query = new BoolQueryBuilder().must(pathClauses);
+		if (!includeEnded) {
+			query = query.mustNot(existsQuery("end"));
+		}
+		return new NativeSearchQueryBuilder().withQuery(query).build();
 	}
 
 	public Branch findBranchOrThrow(String path) {
@@ -499,7 +508,6 @@ public class BranchService {
 		previousBranchVersion.setEnd(null);
 		// (Also saves the branch version)
 		lockBranch(previousBranchVersion, getLockMessageOrNull(branchVersion));
-
 		doContentRollback(path, timestamp, domainTypes);
 
 		if (!lockedInitially) {
@@ -565,7 +573,8 @@ public class BranchService {
 		commit.getBranch().setBase(commit.getRebasePreviousBase());
 	}
 
-	public void unlock(String path) {
+	public Branch unlock(String path) {
+		final Branch branch;
 		final List<Branch> branches = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(
 					new BoolQueryBuilder()
@@ -577,12 +586,13 @@ public class BranchService {
 				.stream().map(result -> result.getContent()).collect(Collectors.toList());
 
 		if (!branches.isEmpty()) {
-			final Branch branch = branches.get(0);
+			branch = branches.get(0);
 			clearLock(branch);
 			branchRepository.save(branch);
 		} else {
 			throw new IllegalArgumentException("Branch not found " + path);
 		}
+		return branch;
 	}
 
 	public void addCommitListener(CommitListener commitListener) {
@@ -611,4 +621,5 @@ public class BranchService {
 	public List<CommitListener> getCommitListeners() {
 		return Collections.unmodifiableList(commitListeners);
 	}
+
 }
