@@ -5,7 +5,6 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.repositories.BranchRepository;
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.query.BoolQueryBuilder;
@@ -239,7 +238,6 @@ public class BranchService {
 		SearchHits<Branch> response = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(boolQuery()
 						.must(termQuery("path", path))
-						.must(rangeQuery("base").lte(timepoint.getTime()))
 						.must(boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
 								.should(rangeQuery("end").gt(timepoint.getTime()))))
@@ -497,6 +495,7 @@ public class BranchService {
 		Branch previousBranchVersion = findAtTimepointOrThrow(path, new Date(timestamp - 1));
 		branchRepository.delete(branchVersion);
 		previousBranchVersion.setEnd(null);
+		previousBranchVersion.setLocked(false);
 		// (Also saves the branch version)
 		lockBranch(previousBranchVersion, getLockMessageOrNull(branchVersion));
 
