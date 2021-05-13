@@ -238,6 +238,7 @@ public class BranchService {
 		SearchHits<Branch> response = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder()
 				.withQuery(boolQuery()
 						.must(termQuery("path", path))
+						.must(rangeQuery("base").lte(timepoint.getTime()))
 						.must(boolQuery()
 								.should(boolQuery().mustNot(existsQuery("end")))
 								.should(rangeQuery("end").gt(timepoint.getTime()))))
