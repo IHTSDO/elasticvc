@@ -505,6 +505,12 @@ public class BranchService {
 			unlock(commit.getSourceBranchPath());
 		}
 
+		// Restore previous metadata
+		final Branch latest = findLatest(branch.getPath());
+		if (latest != null) {
+			branch.setMetadata(latest.getMetadata());
+		}
+
 		save(branch);
 	}
 
