@@ -73,6 +73,9 @@ public class BranchService {
 	}
 
 	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Metadata metadata, Date specificBaseTimepoint) {
+		if (metadata == null) {
+			metadata = new Metadata();
+		}
 		Assert.notNull(path, "Branch path can not be null.");
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
 		Assert.isTrue(path.startsWith("MAIN"), "The root branch must be 'MAIN'.");
@@ -111,6 +114,9 @@ public class BranchService {
 	}
 
 	private void updateInternalMetadata(Branch branch) {
+		if (branch.getMetadata() == null) {
+			branch.setMetadata(new Metadata());
+		}
 		final Map<String, String> flatMetadata = branchMetadataHelper.flattenObjectValues(branch.getMetadata().getAsMap());
 		branch.setMetadataInternal(flatMetadata);
 	}

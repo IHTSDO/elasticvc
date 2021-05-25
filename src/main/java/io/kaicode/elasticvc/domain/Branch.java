@@ -7,7 +7,6 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Document(indexName = "branch")
 public class Branch extends Entity {
@@ -57,6 +56,7 @@ public class Branch extends Entity {
 	public Branch() {
 		head = new Date();
 		versionsReplaced = new HashMap<>();
+		metadata = new Metadata();
 	}
 
 	public Branch(String path) {

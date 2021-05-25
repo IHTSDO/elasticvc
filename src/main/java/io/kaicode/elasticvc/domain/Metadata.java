@@ -71,4 +71,11 @@ public class Metadata {
 	public int size() {
 		return internalMap.size();
 	}
+
+	@Override
+	public String toString() {
+		return "Metadata{" +
+				"map=" + internalMap +
+				'}';
+	}
 }
