@@ -1,9 +1,11 @@
 package io.kaicode.elasticvc.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Iterators;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
+import io.kaicode.elasticvc.domain.Metadata;
 import io.kaicode.elasticvc.repositories.BranchRepository;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Strings;
@@ -35,12 +37,13 @@ public class BranchService {
 
 	public static final String LOCK_METADATA_KEY = "lock";
 
-
 	@Autowired
 	private BranchRepository branchRepository;
 
 	@Autowired
 	private ElasticsearchRestTemplate elasticsearchRestTemplate;
+
+	private final BranchMetadataHelper branchMetadataHelper;
 
 	private final List<CommitListener> commitListeners;
 
@@ -48,16 +51,17 @@ public class BranchService {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	public BranchService() {
+	public BranchService(@Autowired ObjectMapper objectMapper) {
 		commitListeners = new ArrayList<>();
+		branchMetadataHelper = new BranchMetadataHelper(objectMapper);
 	}
 
 	public Branch create(String path) {
 		return create(path, null);
 	}
 
-	public Branch create(String path, Map<String, String> metadata) {
-		return doCreate(path, false, new Date(), metadata, null);
+	public Branch create(String path, Map<String, Object> metadataMap) {
+		return doCreate(path, false, new Date(), new Metadata(metadataMap), null);
 	}
 
 	public void createAtBaseTimepoint(String path, Date specificBaseTimepoint) {
@@ -68,7 +72,7 @@ public class BranchService {
 		return doCreate(path, true, new Date(), null, null);
 	}
 
-	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Map<String, String> metadata, Date specificBaseTimepoint) {
+	private Branch doCreate(String path, boolean recursive, Date commitTimepoint, Metadata metadata, Date specificBaseTimepoint) {
 		Assert.notNull(path, "Branch path can not be null.");
 		Assert.isTrue(!path.contains("_"), "Branch path may not contain the underscore character: " + path);
 		Assert.isTrue(path.startsWith("MAIN"), "The root branch must be 'MAIN'.");
@@ -100,10 +104,15 @@ public class BranchService {
 		branch.setBase(base);
 		branch.setHead(commitTimepoint);
 		branch.setStart(commitTimepoint);
-		branch.setMetadataInternal(metadata);
+		branch.setMetadata(metadata);
 		branch.setCreation(commitTimepoint);
 		logger.info("Creating branch {}", branch);
-		return branchRepository.save(branch).setState(Branch.BranchState.UP_TO_DATE);
+		return save(branch).setState(Branch.BranchState.UP_TO_DATE);
+	}
+
+	private void updateInternalMetadata(Branch branch) {
+		final Map<String, String> flatMetadata = branchMetadataHelper.flattenObjectValues(branch.getMetadata().getAsMap());
+		branch.setMetadataInternal(flatMetadata);
 	}
 
 	public boolean exists(String path) {
@@ -135,6 +144,7 @@ public class BranchService {
 		if (branch == null) {
 			return null;
 		}
+		updatePublicMetadata(branch);
 
 		if (!path.contains(PathUtil.SEPARATOR)) {
 			// Root branch is always up to date
@@ -177,9 +187,9 @@ public class BranchService {
 			String parentPath = PathUtil.getParentPath(branch.getPath());
 			if (parentPath != null) {
 				Branch parent = findBranchOrThrow(parentPath, true);
-				Map<String, String> parentMetadata = parent.getMetadata();
+				Map<String, String> parentMetadata = parent.getMetadataInternal();
 				if (parentMetadata != null) {
-					Map<String, String> metadata = branch.getMetadata();
+					Map<String, String> metadata = branch.getMetadataInternal();
 					if (metadata != null) {
 						for (String key : parentMetadata.keySet()) {
 							if (!metadata.containsKey(key)) {
@@ -192,6 +202,15 @@ public class BranchService {
 					branch.setMetadataInternal(metadata);
 				}
 			}
+		}
+		updatePublicMetadata(branch);
+		return branch;
+	}
+
+	private Branch updatePublicMetadata(Branch branch) {
+		if (branch != null) {
+			final Map<String, Object> publicMetadata = branchMetadataHelper.expandObjectValues(branch.getMetadataInternal());
+			branch.setMetadata(new Metadata(publicMetadata));
 		}
 		return branch;
 	}
@@ -207,7 +226,7 @@ public class BranchService {
 		if (branchVersions.isEmpty()) {
 			throw new BranchNotFoundException("Branch '" + path + "' does not exist.");
 		}
-		return branchVersions.iterator().next();
+		return updatePublicMetadata(branchVersions.iterator().next());
 	}
 
 	public Page<Branch> findAllVersions(String path, Pageable pageable) {
@@ -218,20 +237,7 @@ public class BranchService {
 						.withPageable(pageable)
 						.build(), Branch.class);
 
-		return new PageImpl<>(results.get().map(hit -> hit.getContent()).collect(Collectors.toList()), pageable, results.getTotalHits());
-	}
-
-	public Page<Branch> findAllVersionsAfterTimestamp(String path, Date timestamp, Pageable pageable) {
-		SearchHits<Branch> searchHits = elasticsearchRestTemplate.search(
-				new NativeSearchQueryBuilder()
-						.withQuery(boolQuery()
-								.must(termQuery("path", path))
-								.must(rangeQuery("start").gt(timestamp.getTime())))
-						.withSort(SortBuilders.fieldSort("start"))
-						.withPageable(pageable)
-						.build(), Branch.class, elasticsearchRestTemplate.getIndexCoordinatesFor(Branch.class));
-		return new PageImpl<>(searchHits.stream().map(hit -> hit.getContent()).collect(Collectors.toList()), pageable, searchHits.getTotalHits());
-
+		return new PageImpl<>(results.get().map(SearchHit::getContent).map(this::updatePublicMetadata).collect(Collectors.toList()), pageable, results.getTotalHits());
 	}
 
 	public Branch findAtTimepointOrThrow(String path, Date timepoint) {
@@ -264,7 +270,9 @@ public class BranchService {
 			throw new IllegalStateException("Branch '" + path + "' does not exist at timepoint " + timepoint + " (" + timepoint.getTime() + ").");
 		}
 
-		return branches.get(0);
+		final Branch branch = branches.get(0);
+		updatePublicMetadata(branch);
+		return branch;
 	}
 
 	public List<Branch> findAll() {
@@ -289,11 +297,11 @@ public class BranchService {
 				.build(), Branch.class);
 
 		final List<Branch> children = new ArrayList<>();
-		results.forEach(r -> children.add(r.getContent()));
+		results.forEach(r -> children.add(updatePublicMetadata(r.getContent())));
 		if (immediateChildren) {
 			Branch parent = findBranchOrThrow(path);
 			return children.stream()
-					.filter(child -> parent.isParent(child))
+					.filter(parent::isParent)
 					.collect(Collectors.toList());
 		}
 		return children;
@@ -338,20 +346,18 @@ public class BranchService {
 			throw new IllegalStateException(String.format("Branch %s is already locked", branch.getPath()));
 		}
 		branch.setLocked(true);
-		Map<String, String> metadata = branch.getMetadata();
-		if (metadata == null) {
-			metadata = new HashMap<>();
-		}
-		metadata.put(LOCK_METADATA_KEY, lockMetadataMessage);
-		branch.setMetadata(metadata);
-		branch = branchRepository.save(branch);
-		return branch;
+		branch.getMetadata().putString(LOCK_METADATA_KEY, lockMetadataMessage);
+		return save(branch);
 	}
 
-	public Branch updateMetadata(String path, Map<String, String> metadata) {
+	public Branch updateMetadata(String path, Metadata metadata) {
+		return updateMetadata(path, metadata.getAsMap());
+	}
+
+	public Branch updateMetadata(String path, Map<String, Object> metadataMap) {
 		Branch branch = findBranchOrThrow(path);
-		branch.setMetadata(metadata);
-		return branchRepository.save(branch);
+		branch.getMetadata().putAll(metadataMap);
+		return save(branch);
 	}
 
 	public Commit openRebaseCommit(String path) {
@@ -462,8 +468,18 @@ public class BranchService {
 
 		logger.debug("Ending branch timespan {}", oldBranchTimespan);
 		logger.debug("Starting branch timespan {}", newBranchTimespan);
-		branchRepository.saveAll(newBranchVersionsToSave);
+		saveAll(newBranchVersionsToSave);
 		logger.info("Completed commit on {} at {}", commit.getBranch().getPath(), commit.getTimepoint().getTime());
+	}
+
+	private Branch save(Branch branch) {
+		updateInternalMetadata(branch);
+		return branchRepository.save(branch);
+	}
+
+	private void saveAll(Iterable<Branch> branches) {
+		branches.forEach(this::updateInternalMetadata);
+		branchRepository.saveAll(branches);
 	}
 
 	private void rollbackCommit(Commit commit) {
@@ -483,7 +499,7 @@ public class BranchService {
 			unlock(commit.getSourceBranchPath());
 		}
 
-		branchRepository.save(branch);
+		save(branch);
 	}
 
 	public void rollbackCompletedCommit(Branch branchVersion, List<Class<? extends DomainEntity>> domainTypes) {
@@ -554,11 +570,7 @@ public class BranchService {
 	}
 
 	public String getLockMessageOrNull(Branch branchVersion) {
-		Map<String, String> metadata = branchVersion.getMetadata();
-		if (metadata != null) {
-			return metadata.get(LOCK_METADATA_KEY);
-		}
-		return null;
+		return branchVersion.getMetadata().getString(LOCK_METADATA_KEY);
 	}
 
 	private void resetBranchBase(Commit commit) {
@@ -574,12 +586,13 @@ public class BranchService {
 					)
 				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class)
-				.stream().map(result -> result.getContent()).collect(Collectors.toList());
+				.stream().map(SearchHit::getContent).collect(Collectors.toList());
 
 		if (!branches.isEmpty()) {
 			final Branch branch = branches.get(0);
+			updatePublicMetadata(branch);
 			clearLock(branch);
-			branchRepository.save(branch);
+			save(branch);
 		} else {
 			throw new IllegalArgumentException("Branch not found " + path);
 		}
@@ -598,10 +611,7 @@ public class BranchService {
 
 	private void clearLock(Branch branchVersion) {
 		branchVersion.setLocked(false);
-		Map<String, String> metadata = branchVersion.getMetadata();
-		if (metadata != null) {
-			metadata.remove(LOCK_METADATA_KEY);
-		}
+		branchVersion.getMetadata().remove(LOCK_METADATA_KEY);
 	}
 
 	/**

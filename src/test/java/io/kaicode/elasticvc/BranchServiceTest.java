@@ -4,6 +4,8 @@ import io.kaicode.elasticvc.api.BranchService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.repositories.BranchRepository;
+import org.assertj.core.util.Maps;
+import org.elasticsearch.common.collect.MapBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,7 +119,7 @@ public class BranchServiceTest extends AbstractTest {
 	public void testBranchState() {
 		IndexOperations indexOps = elasticsearchRestTemplate.indexOps(Branch.class);
 		indexOps.putMapping(indexOps.createMapping(Branch.class));
-		Map<String, String> meta = new HashMap<>();
+		Map<String, Object> meta = new HashMap<>();
 		meta.put("test", "123");
 		branchService.create("MAIN", meta);
 
@@ -189,7 +191,7 @@ public class BranchServiceTest extends AbstractTest {
 		Branch main = branchService.findLatest("MAIN");
 		assertNotNull(main.getMetadata());
 		assertEquals(1, main.getMetadata().size());
-		assertEquals("123", main.getMetadata().get("test"));
+		assertEquals("123", main.getMetadata().getString("test"));
 	}
 
 	@Test
@@ -206,13 +208,15 @@ public class BranchServiceTest extends AbstractTest {
 
 	@Test
 	public void testMetadata() {
-		Map<String, String> metadata = new HashMap<>();
+		Map<String, Object> metadata = new HashMap<>();
 		metadata.put("something", "123");
 		metadata.put("something-else", "456");
+		metadata.put("some.nested.value", "this");
+		metadata.put("that", Maps.newHashMap("that", "true"));
 		branchService.create("MAIN", metadata);
 
 		Branch main = branchService.findLatest("MAIN");
-		assertEquals(metadata, main.getMetadata());
+		assertEquals(metadata, main.getMetadata().getAsMap());
 	}
 
 	@Test
@@ -230,7 +234,7 @@ public class BranchServiceTest extends AbstractTest {
 
 	@Test
 	public void testLoadInheritedMetadata() {
-		Map<String, String> metadataA = new HashMap<>();
+		Map<String, Object> metadataA = new HashMap<>();
 		metadataA.put("A", "A1");
 		metadataA.put("B", "B1");
 		branchService.create("MAIN", metadataA);
@@ -238,7 +242,7 @@ public class BranchServiceTest extends AbstractTest {
 
 		branchService.create("MAIN/one");
 
-		Map<String, String> metadataB = new HashMap<>();
+		Map<String, Object> metadataB = new HashMap<>();
 		metadataB.put("B", "B2");
 		metadataB.put("C", "C2");
 		branchService.create("MAIN/one/two", metadataB);
@@ -248,9 +252,9 @@ public class BranchServiceTest extends AbstractTest {
 		mergedMetadata.put("B", "B2");
 		mergedMetadata.put("C", "C2");
 
-		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata());
-		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN/one", true).getMetadata());
-		assertEquals(mergedMetadata, branchService.findBranchOrThrow("MAIN/one/two", true).getMetadata());
+		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata().getAsMap());
+		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN/one", true).getMetadata().getAsMap());
+		assertEquals(mergedMetadata, branchService.findBranchOrThrow("MAIN/one/two", true).getMetadata().getAsMap());
 	}
 
 	private void assertBranchState(String path, Branch.BranchState status) {

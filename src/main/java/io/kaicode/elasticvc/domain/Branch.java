@@ -44,6 +44,9 @@ public class Branch extends Entity {
 	private Map<String, String> metadataInternal;
 
 	@Transient
+	private Metadata metadata;
+
+	@Transient
 	private BranchState state;
 
 	public enum BranchState {
@@ -193,12 +196,12 @@ public class Branch extends Entity {
 		return this;
 	}
 
-	public Map<String, String> getMetadata() {
-		return replaceMapKeyCharacters(metadataInternal, "|", ".");
+	public Metadata getMetadata() {
+		return metadata;
 	}
 
-	public void setMetadata(Map<String, String> metadata) {
-		this.metadataInternal = replaceMapKeyCharacters(metadata, ".", "|");
+	public void setMetadata(Metadata metadata) {
+		this.metadata = metadata;
 	}
 
 	public Map<String, String> getMetadataInternal() {
@@ -207,17 +210,6 @@ public class Branch extends Entity {
 
 	public void setMetadataInternal(Map<String, String> metadataInternal) {
 		this.metadataInternal = metadataInternal;
-	}
-
-	private Map<String, String> replaceMapKeyCharacters(Map<String, String> metadata, String s1, String s2) {
-		if (metadata != null) {
-			Set<String> replaceKeys = metadata.keySet().stream().filter(k -> k.contains(s1)).collect(Collectors.toSet());
-			for (String key : replaceKeys) {
-				metadata.put(key.replace(s1, s2), metadata.get(key));
-				metadata.remove(key);
-			}
-		}
-		return metadata;
 	}
 
 	@Override
