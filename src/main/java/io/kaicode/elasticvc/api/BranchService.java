@@ -362,7 +362,7 @@ public class BranchService {
 
 	public Branch updateMetadata(String path, Map<String, Object> metadataMap) {
 		Branch branch = findBranchOrThrow(path);
-		branch.getMetadata().putAll(metadataMap);
+		branch.setMetadata(new Metadata(metadataMap));
 		return save(branch);
 	}
 
