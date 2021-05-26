@@ -389,6 +389,7 @@ public class BranchService {
 			}
 			commit.setRebasePreviousBase(branch.getBase());
 			branch.setBase(parentBranch.getHead());
+			commit.setSourceBranchPath(parentPath);
 		}
 		return commit;
 	}
