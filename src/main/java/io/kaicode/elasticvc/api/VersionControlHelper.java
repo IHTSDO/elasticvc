@@ -200,7 +200,7 @@ public class VersionControlHelper {
 				thisBranchShouldClause.must(boolQuery()
 						.should(termQuery("start", timepoint.getTime()))
 						.should(termQuery("end", timepoint.getTime())));
-				// Include versions just deleted in this commit, from any branch
+				// Include versions just deleted in this commit, from any ancestor
 				branchCriteria.should(termsQuery("_id", versionsReplaced.values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
 
 				if (commit != null && commit.isRebase()) {
@@ -237,20 +237,22 @@ public class VersionControlHelper {
 				break;
 
 			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH: {
-					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
+				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
 				thisBranchShouldClause.must(boolQuery()
-							.should(rangeQuery("start").gte(startPoint.getTime()))
-							.should(rangeQuery("end").gte(startPoint.getTime())));
-				}
-				break;
+						.should(rangeQuery("start").gte(startPoint.getTime()))
+						.should(rangeQuery("end").gte(startPoint.getTime())));
+				// Include versions deleted on this branch, from any ancestor
+				branchCriteria.should(termsQuery("_id", branch.getVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
+			}
+			break;
 
 			case UNPROMOTED_CHANGES_ON_THIS_BRANCH: {
-					Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
+				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
 				thisBranchShouldClause
-							.must(rangeQuery("start").gte(startPoint.getTime()))
-							.mustNot(existsQuery("end"));
-				}
-				break;
+						.must(rangeQuery("start").gte(startPoint.getTime()))
+						.mustNot(existsQuery("end"));
+			}
+			break;
 		}
 		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
 		BoolQueryBuilder must = boolQuery().must(branchCriteria);
