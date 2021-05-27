@@ -201,7 +201,7 @@ public class VersionControlHelper {
 						.should(termQuery("start", timepoint.getTime()))
 						.should(termQuery("end", timepoint.getTime())));
 				// Include versions just deleted in this commit, from any ancestor
-				branchCriteria.should(termsQuery("_id", versionsReplaced.values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
+				branchCriteria.should(termsQuery("_id", commit.getEntityVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
 
 				if (commit != null && commit.isRebase()) {
 
