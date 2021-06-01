@@ -193,23 +193,25 @@ public class BranchService {
 			String parentPath = PathUtil.getParentPath(branch.getPath());
 			if (parentPath != null) {
 				Branch parent = findBranchOrThrow(parentPath, true);
-				Map<String, String> parentMetadata = parent.getMetadataInternal();
-				if (parentMetadata != null) {
-					Map<String, String> metadata = branch.getMetadataInternal();
-					if (metadata != null) {
-						for (String key : parentMetadata.keySet()) {
+				if (parent.getMetadataInternal() != null) {
+					final Metadata metadata = branch.getMetadata();
+					final Metadata parentMetadata = parent.getMetadata();
+					parentMetadata.getAsMap().forEach((key, value) -> {
+						if (value instanceof Map) {
+							// If map merge values with what is existing on this branch
+							@SuppressWarnings("unchecked")
+							final Map<String, String> mapValue = (Map<String, String>) value;
+							metadata.getMapOrCreate(key).putAll(mapValue);
+						} else {
+							// If not map only keep new keys
 							if (!metadata.containsKey(key)) {
-								metadata.put(key, parentMetadata.get(key));
+								metadata.getAsMap().put(key, value);
 							}
 						}
-					} else {
-						metadata = parentMetadata;
-					}
-					branch.setMetadataInternal(metadata);
+					});
 				}
 			}
 		}
-		updatePublicMetadata(branch);
 		return branch;
 	}
 
