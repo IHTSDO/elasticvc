@@ -201,7 +201,7 @@ public class BranchService {
 							// If map merge values with what is existing on this branch
 							@SuppressWarnings("unchecked")
 							final Map<String, String> mapValue = (Map<String, String>) value;
-							metadata.getMapOrCreate(key).putAll(mapValue);
+							mapValue.keySet().forEach(k -> metadata.getMapOrCreate(key).putIfAbsent(k, mapValue.get(k)));
 						} else {
 							// If not map only keep new keys
 							if (!metadata.containsKey(key)) {

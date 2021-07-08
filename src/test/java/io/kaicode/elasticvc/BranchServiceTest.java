@@ -5,7 +5,6 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.repositories.BranchRepository;
 import org.assertj.core.util.Maps;
-import org.elasticsearch.common.collect.MapBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -237,6 +236,9 @@ public class BranchServiceTest extends AbstractTest {
 		Map<String, Object> metadataA = new HashMap<>();
 		metadataA.put("A", "A1");
 		metadataA.put("B", "B1");
+		Map<String, String> internalValueMap = Maps.newHashMap("this", "true");
+		internalValueMap.put("that", "true");
+		metadataA.put("internal", internalValueMap);
 		branchService.create("MAIN", metadataA);
 		makeEmptyCommit("MAIN");
 
@@ -245,12 +247,18 @@ public class BranchServiceTest extends AbstractTest {
 		Map<String, Object> metadataB = new HashMap<>();
 		metadataB.put("B", "B2");
 		metadataB.put("C", "C2");
+		internalValueMap = Maps.newHashMap("this", "false");
+		internalValueMap.put("another", "taskOnly");
+		metadataB.put("internal", internalValueMap);
 		branchService.create("MAIN/one/two", metadataB);
 
-		Map<String, String> mergedMetadata = new HashMap<>();
+		Map<String, Object> mergedMetadata = new HashMap<>();
 		mergedMetadata.put("A", "A1");
 		mergedMetadata.put("B", "B2");
 		mergedMetadata.put("C", "C2");
+		// value from parent
+		internalValueMap.put("that", "true");
+		mergedMetadata.put("internal", internalValueMap);
 
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata().getAsMap());
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN/one", true).getMetadata().getAsMap());
