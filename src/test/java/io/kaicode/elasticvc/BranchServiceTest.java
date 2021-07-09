@@ -1,5 +1,7 @@
 package io.kaicode.elasticvc;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kaicode.elasticvc.api.BranchService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
@@ -11,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static io.kaicode.elasticvc.domain.Branch.BranchState.*;
@@ -25,6 +28,11 @@ public class BranchServiceTest extends AbstractTest {
 
 	@Autowired
 	private BranchRepository branchRepository;
+
+	@Autowired
+	private ObjectMapper objectMapper;
+
+	private final SimpleDateFormat lockMetadataDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
 	@Test
 	public void testCreateFindBranches() {
@@ -213,7 +221,6 @@ public class BranchServiceTest extends AbstractTest {
 		metadata.put("some.nested.value", "this");
 		metadata.put("that", Maps.newHashMap("that", "true"));
 		branchService.create("MAIN", metadata);
-
 		Branch main = branchService.findLatest("MAIN");
 		assertEquals(metadata, main.getMetadata().getAsMap());
 	}
@@ -259,8 +266,9 @@ public class BranchServiceTest extends AbstractTest {
 		// value from parent
 		internalValueMap.put("that", "true");
 		mergedMetadata.put("internal", internalValueMap);
-
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata().getAsMap());
+		// lock branch to add lock message metadata and make sure it is not inherited by child branch
+		branchService.lockBranch("MAIN", getBranchLockMetadata("Classifying"));
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN/one", true).getMetadata().getAsMap());
 		assertEquals(mergedMetadata, branchService.findBranchOrThrow("MAIN/one/two", true).getMetadata().getAsMap());
 	}
@@ -272,6 +280,20 @@ public class BranchServiceTest extends AbstractTest {
 	private void makeEmptyCommit(String path) {
 		try (Commit commit = branchService.openCommit(path, "Empty commit.")) {
 			commit.markSuccessful();
+		}
+	}
+
+	private String getBranchLockMetadata(String description) {
+		Map<String, Object> lockMeta = new HashMap<>();
+		lockMeta.put("creationDate", lockMetadataDateFormat.format(new Date()));
+		Map<String, Object> lockContext = new HashMap<>();
+		lockContext.put("userId", "test");
+		lockContext.put("description", description);
+		lockMeta.put("context", lockContext);
+		try {
+			return "{object}|" + objectMapper.writeValueAsString(lockMeta);
+		} catch (JsonProcessingException e) {
+			throw new RuntimeException("Failed to serialise branch lock metadata", e);
 		}
 	}
 

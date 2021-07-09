@@ -197,15 +197,17 @@ public class BranchService {
 					final Metadata metadata = branch.getMetadata();
 					final Metadata parentMetadata = parent.getMetadata();
 					parentMetadata.getAsMap().forEach((key, value) -> {
-						if (value instanceof Map) {
-							// If map merge values with what is existing on this branch
-							@SuppressWarnings("unchecked")
-							final Map<String, String> mapValue = (Map<String, String>) value;
-							mapValue.keySet().forEach(k -> metadata.getMapOrCreate(key).putIfAbsent(k, mapValue.get(k)));
-						} else {
-							// If not map only keep new keys
-							if (!metadata.containsKey(key)) {
-								metadata.getAsMap().put(key, value);
+						if (!LOCK_METADATA_KEY.equals(key)) {
+							if (value instanceof Map) {
+								// If map merge values with what is existing on this branch
+								final Map merged = (Map) value;
+								merged.putAll(metadata.getMapOrCreate(key));
+								metadata.getMapOrCreate(key).putAll(merged);
+							} else {
+								// If not map only keep new keys
+								if (!metadata.containsKey(key)) {
+									metadata.getAsMap().put(key, value);
+								}
 							}
 						}
 					});
