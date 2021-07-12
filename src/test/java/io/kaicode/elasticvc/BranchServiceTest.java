@@ -246,6 +246,9 @@ public class BranchServiceTest extends AbstractTest {
 		Map<String, String> internalValueMap = Maps.newHashMap("this", "true");
 		internalValueMap.put("that", "true");
 		metadataA.put("internal", internalValueMap);
+
+		Map<String, String> additionalValueMap = Maps.newHashMap("Another", "only exists in parent branch");
+		metadataA.put("internal_additional", additionalValueMap);
 		branchService.create("MAIN", metadataA);
 		makeEmptyCommit("MAIN");
 
@@ -263,9 +266,11 @@ public class BranchServiceTest extends AbstractTest {
 		mergedMetadata.put("A", "A1");
 		mergedMetadata.put("B", "B2");
 		mergedMetadata.put("C", "C2");
-		// value from parent
-		internalValueMap.put("that", "true");
+		// child task value
 		mergedMetadata.put("internal", internalValueMap);
+
+		// parent's value only
+		mergedMetadata.put("internal_additional", additionalValueMap);
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata().getAsMap());
 		// lock branch to add lock message metadata and make sure it is not inherited by child branch
 		branchService.lockBranch("MAIN", getBranchLockMetadata("Classifying"));
