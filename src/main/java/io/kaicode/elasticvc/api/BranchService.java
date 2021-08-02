@@ -431,6 +431,9 @@ public class BranchService {
 		newBranchTimespan.setCreation(oldBranchTimespan.getCreation());
 		newBranchTimespan.setLastPromotion(oldBranchTimespan.getLastPromotion());
 
+		// Preserve existing commit versions replaced
+		oldBranchTimespan.setVersionsReplaced(findBranchOrThrow(path).getVersionsReplaced());
+
 		final List<Branch> newBranchVersionsToSave = new ArrayList<>();
 		newBranchVersionsToSave.add(oldBranchTimespan);
 		newBranchVersionsToSave.add(newBranchTimespan);
