@@ -27,7 +27,7 @@ import java.util.Date;
 public class TestConfiguration extends AbstractElasticsearchConfiguration {
 
 	// Current version supported by AWS is 7.7.0
-	private static final String ELASTIC_SEARCH_DOCKER = "elasticsearch:7.7.0";
+	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:7.7.0";
 
 	@Container
 	private static ElasticsearchContainer elasticsearchContainer;
