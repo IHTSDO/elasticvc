@@ -256,7 +256,7 @@ public class VersionControlHelper {
 		}
 		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
 		BoolQueryBuilder must = boolQuery().must(branchCriteria);
-		return new BranchCriteria(must, allEntityVersionsReplaced);
+		return new BranchCriteria(must, allEntityVersionsReplaced, timepoint);
 	}
 
 	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced) {
