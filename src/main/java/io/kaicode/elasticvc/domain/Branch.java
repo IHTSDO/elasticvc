@@ -10,6 +10,10 @@ import java.util.*;
 
 @Document(indexName = "branch")
 public class Branch extends Entity {
+	public interface Fields {
+		String PATH = "path";
+		String END = "end";
+	}
 
 	/**
 	 * The root branch path.
