@@ -20,8 +20,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.elasticsearch.core.*;
-import org.springframework.data.elasticsearch.core.query.*;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
+import org.springframework.data.elasticsearch.core.query.Query;
+import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.data.util.CloseableIterator;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -41,7 +46,7 @@ public class BranchService {
 	private BranchRepository branchRepository;
 
 	@Autowired
-	private ElasticsearchRestTemplate elasticsearchRestTemplate;
+	private ElasticsearchOperations elasticsearchRestTemplate;
 
 	private final BranchMetadataHelper branchMetadataHelper;
 
@@ -491,7 +496,7 @@ public class BranchService {
 
 		@SuppressWarnings("unchecked")
 		Set<Class<? extends DomainEntity>> domainEntityClasses = commit.getDomainEntityClasses().stream().map(clazz -> (Class<? extends DomainEntity>) clazz).collect(Collectors.toSet());
-		doContentRollback(commit.getBranch().getPath(), commit.getTimepoint().getTime(), domainEntityClasses);
+		doContentRollback(commit.getBranch().getPath(), commit.getSourceBranchPath(), commit.getTimepoint().getTime(), domainEntityClasses);
 
 		Branch branch = commit.getBranch();
 		if (commit.isRebase()) {
@@ -526,7 +531,14 @@ public class BranchService {
 		// (Also saves the branch version)
 		lockBranch(previousBranchVersion, getLockMessageOrNull(branchVersion));
 
-		doContentRollback(path, timestamp, domainTypes);
+		SearchHits<Branch> searchHits = elasticsearchRestTemplate.search(new NativeSearchQueryBuilder().withQuery(boolQuery()
+				.must(prefixQuery(Branch.Fields.PATH, path + "/"))
+				.must(termQuery(Branch.Fields.END, timestamp))).build(), Branch.class);
+		String promotionSourceBranch = null;
+		if (!searchHits.isEmpty()) {
+			promotionSourceBranch = searchHits.getSearchHit(0).getContent().getPath();
+		}
+		doContentRollback(path, promotionSourceBranch, timestamp, domainTypes);
 
 		if (!lockedInitially) {
 			unlock(path);
@@ -535,7 +547,7 @@ public class BranchService {
 		logger.info("Completed rollback of commit {} on {}.", timestamp, path);
 	}
 
-	private void doContentRollback(String path, long timestamp, Collection<Class<? extends DomainEntity>> domainTypes) {
+	private void doContentRollback(String path, String promotionSourceBranch, long timestamp, Collection<Class<? extends DomainEntity>> domainTypes) {
 		logger.info("Deleting documents on {} started at {}.", path, timestamp);
 		Query deleteQuery = new NativeSearchQueryBuilder().withQuery(boolQuery()
 				.must(termQuery("path", path))
@@ -545,14 +557,19 @@ public class BranchService {
 			elasticsearchRestTemplate.indexOps(domainEntityClass).refresh();
 		}
 
-		logger.info("Clearing end time for documents on {} ended at {}.", timestamp, path);
+		Set<String> branchPaths = new HashSet<>();
+		branchPaths.add(path);
+		if (promotionSourceBranch != null) {
+			branchPaths.add(promotionSourceBranch);
+		}
+		logger.info("Clearing end time for documents on {} ended at {}.", branchPaths, timestamp);
 		for (Class<? extends DomainEntity> type : domainTypes) {
 			// Find ended documents
 			Set<String> endedDocumentIds = new HashSet<>();
 			NativeSearchQuery endedDocumentQuery = new NativeSearchQueryBuilder()
 					.withQuery(boolQuery()
 							.must(termQuery("end", timestamp))
-							.must(termQuery("path", path)))
+							.must(termsQuery("path", branchPaths)))
 					.withFields("internalId")
 					.withPageable(LARGE_PAGE).build();
 			try (final CloseableIterator<? extends DomainEntity> endedDocs = elasticsearchRestTemplate.stream(endedDocumentQuery, type, elasticsearchRestTemplate.getIndexCoordinatesFor(type))) {
