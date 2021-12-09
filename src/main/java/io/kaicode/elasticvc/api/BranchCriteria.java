@@ -3,35 +3,54 @@ package io.kaicode.elasticvc.api;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 
-import java.util.Date;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termsQuery;
 
 public class BranchCriteria {
 
-	private final BoolQueryBuilder branchCriteria;
-	private final Map<String, Set<String>> allEntityVersionsReplaced;
+	private final String branchPath;
 	private final Date timepoint;
+	private BoolQueryBuilder branchCriteria;
+	private Map<String, Set<String>> allEntityVersionsReplaced;
+	private List<String> excludeContentFromPath;
 
-	BranchCriteria(BoolQueryBuilder branchCriteria, Map<String, Set<String>> allEntityVersionsReplaced, Date timepoint) {
-		this.branchCriteria = branchCriteria;
-		this.allEntityVersionsReplaced = allEntityVersionsReplaced;
+	BranchCriteria(String branchPath, Date timepoint) {
+		this.branchPath = branchPath;
 		this.timepoint = timepoint;
 	}
 
-	public BoolQueryBuilder getEntityBranchCriteria(Class<? extends DomainEntity> entityClass) {
+	public BranchCriteria(String branchPath, BoolQueryBuilder branchCriteria, Map<String, Set<String>> allEntityVersionsReplaced, Date timepoint) {
+		this(branchPath, timepoint);
+		this.branchCriteria = branchCriteria;
+		this.allEntityVersionsReplaced = allEntityVersionsReplaced;
+	}
+
+	public BoolQueryBuilder getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
+		BoolQueryBuilder boolQueryBuilder = boolQuery().must(branchCriteria);
+
 		if (allEntityVersionsReplaced != null && !allEntityVersionsReplaced.isEmpty()) {
 			Set<String> values = allEntityVersionsReplaced.get(entityClass.getSimpleName());
 			if (values != null && !values.isEmpty()) {
-				return boolQuery()
-						.must(branchCriteria)
-						.mustNot(termsQuery("_id", values));
+				boolQueryBuilder.mustNot(termsQuery("_id", values));
 			}
 		}
-		return boolQuery().must(branchCriteria);
+		if (excludeContentFromPath != null && !excludeContentFromPath.isEmpty()) {
+			boolQueryBuilder.mustNot(termsQuery("path", excludeContentFromPath));
+		}
+		return boolQueryBuilder;
+	}
+
+	public void excludeContentFromPath(String path) {
+		if (excludeContentFromPath == null) {
+			excludeContentFromPath = new ArrayList<>();
+		}
+		excludeContentFromPath.add(path);
+	}
+
+	public String getBranchPath() {
+		return branchPath;
 	}
 
 	public Date getTimepoint() {
@@ -41,6 +60,7 @@ public class BranchCriteria {
 	@Override
 	public String toString() {
 		return "BranchCriteria{" +
+				"branchPath=" + branchPath +
 				"branchCriteria=" + branchCriteria +
 				", allEntityVersionsReplaced=" + (allEntityVersionsReplaced != null ? allEntityVersionsReplaced.size() : 0) +
 				'}';

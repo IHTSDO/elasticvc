@@ -256,7 +256,7 @@ public class VersionControlHelper {
 		}
 		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
 		BoolQueryBuilder must = boolQuery().must(branchCriteria);
-		return new BranchCriteria(must, allEntityVersionsReplaced, timepoint);
+		return new BranchCriteria(branch.getPath(), must, allEntityVersionsReplaced, timepoint);
 	}
 
 	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQueryBuilder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced) {
@@ -293,7 +293,7 @@ public class VersionControlHelper {
 		}
 	}
 
-	<T extends DomainEntity> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchRepository repository) {
+	<T extends DomainEntity<?>> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<? extends Object> ids, ElasticsearchRepository repository) {
 		// End versions of the entity on this path by setting end date
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
 
