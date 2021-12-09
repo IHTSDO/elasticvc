@@ -29,6 +29,12 @@
 			<groupId>org.snomed.otf</groupId>
 			<artifactId>spring-data-elasticsearch</artifactId>
 			<version>4.0.4</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.elasticsearch</groupId>
+					<artifactId>jna</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>net.jodah</groupId>
@@ -71,19 +77,19 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers</artifactId>
-			<version>1.16.0</version>
+			<version>1.16.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>elasticsearch</artifactId>
-			<version>1.16.0</version>
+			<version>1.16.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>junit-jupiter</artifactId>
-			<version>1.16.0</version>
+			<version>1.16.2</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
