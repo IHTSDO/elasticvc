@@ -124,7 +124,7 @@ public class BranchServiceTest extends AbstractTest {
 
 	@Test
 	public void testBranchState() {
-		IndexOperations indexOps = elasticsearchRestTemplate.indexOps(Branch.class);
+		IndexOperations indexOps = elasticsearchTemplate.indexOps(Branch.class);
 		indexOps.putMapping(indexOps.createMapping(Branch.class));
 		Map<String, Object> meta = new HashMap<>();
 		meta.put("test", "123");

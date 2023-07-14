@@ -1,18 +1,18 @@
 package io.kaicode.elasticvc.api;
 
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import io.kaicode.elasticvc.domain.DomainEntity;
-import org.elasticsearch.index.query.BoolQueryBuilder;
 
 import java.util.*;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termsQuery;
+import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
+import static io.kaicode.elasticvc.helper.QueryHelper.termsQuery;
 
 public class BranchCriteria {
 
 	private final String branchPath;
 	private final Date timepoint;
-	private BoolQueryBuilder branchCriteria;
+	private BoolQuery.Builder branchCriteria;
 	private Map<String, Set<String>> allEntityVersionsReplaced;
 	private List<String> excludeContentFromPath;
 
@@ -21,15 +21,14 @@ public class BranchCriteria {
 		this.timepoint = timepoint;
 	}
 
-	public BranchCriteria(String branchPath, BoolQueryBuilder branchCriteria, Map<String, Set<String>> allEntityVersionsReplaced, Date timepoint) {
+	public BranchCriteria(String branchPath, BoolQuery.Builder branchCriteria, Map<String, Set<String>> allEntityVersionsReplaced, Date timepoint) {
 		this(branchPath, timepoint);
 		this.branchCriteria = branchCriteria;
 		this.allEntityVersionsReplaced = allEntityVersionsReplaced;
 	}
 
-	public BoolQueryBuilder getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
-		BoolQueryBuilder boolQueryBuilder = boolQuery().must(branchCriteria);
-
+	public BoolQuery.Builder getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
+		BoolQuery.Builder boolQueryBuilder = bool().must(branchCriteria.build()._toQuery());
 		if (allEntityVersionsReplaced != null && !allEntityVersionsReplaced.isEmpty()) {
 			Set<String> values = allEntityVersionsReplaced.get(entityClass.getSimpleName());
 			if (values != null && !values.isEmpty()) {

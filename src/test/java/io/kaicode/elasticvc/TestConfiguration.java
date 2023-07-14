@@ -1,32 +1,38 @@
 package io.kaicode.elasticvc;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.example.domain.Concept;
-import org.elasticsearch.client.RestHighLevelClient;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.ReadingConverter;
 import org.springframework.data.convert.WritingConverter;
 import org.springframework.data.elasticsearch.client.ClientConfiguration;
-import org.springframework.data.elasticsearch.client.RestClients;
-import org.springframework.data.elasticsearch.config.AbstractElasticsearchConfiguration;
-import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchConfiguration;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.convert.ElasticsearchCustomConversions;
 import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
 import org.testcontainers.junit.jupiter.Container;
 
-import javax.annotation.PostConstruct;
 import java.util.Arrays;
 import java.util.Date;
 
 @SpringBootApplication
 @EnableElasticsearchRepositories(basePackages = "io.kaicode.elasticvc")
-public class TestConfiguration extends AbstractElasticsearchConfiguration {
+public class TestConfiguration extends ElasticsearchConfiguration {
 
-	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:7.10.0";
+	@Autowired
+	private ElasticsearchOperations elasticsearchOperations;
+
+	@Autowired
+	private ElasticsearchClient elasticsearchClient;
+
+	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.7.1";
 
 	@Container
 	private static ElasticsearchContainer elasticsearchContainer;
@@ -40,7 +46,7 @@ public class TestConfiguration extends AbstractElasticsearchConfiguration {
 	public void  initComponentService() {
 		ComponentService.initialiseIndexAndMappingForPersistentClasses(
 				true,
-				elasticsearchRestTemplate(),
+				elasticsearchOperations,
 				Branch.class,
 				Concept.class
 		);
@@ -50,15 +56,12 @@ public class TestConfiguration extends AbstractElasticsearchConfiguration {
 		return elasticsearchContainer;
 	}
 
-	@Bean(name = {"elasticsearchTemplate", "elasticsearchRestTemplate"})
-	public ElasticsearchRestTemplate elasticsearchRestTemplate() {
-		return new ElasticsearchRestTemplate(elasticsearchClient());
-	}
 
 	@Override
-	public RestHighLevelClient elasticsearchClient() {
-		return RestClients.create(ClientConfiguration.builder()
-				.connectedTo(elasticsearchContainer.getHttpHostAddress()).build()).rest();
+	public ClientConfiguration clientConfiguration() {
+		return ClientConfiguration.builder()
+				.connectedTo(elasticsearchContainer.getHttpHostAddress())
+				.build();
 	}
 
 	public static class SnowstormElasticsearchContainer extends ElasticsearchContainer {
@@ -67,6 +70,7 @@ public class TestConfiguration extends AbstractElasticsearchConfiguration {
 			// these are mapped ports used by the test container the actual ports used might be different
 			this.addFixedExposedPort(9235, 9235);
 			this.addFixedExposedPort(9330, 9330);
+			addEnv("xpack.security.enabled", "false");
 			this.addEnv("cluster.name", "integration-test-cluster");
 		}
 	}

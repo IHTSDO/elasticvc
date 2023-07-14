@@ -15,19 +15,35 @@
         <version>2.0.0</version>
     </parent>
 
-    <dependencies>
-        <dependency>
-            <groupId>org.snomed.otf</groupId>
-            <artifactId>spring-data-elasticsearch</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>net.jodah</groupId>
-            <artifactId>typetools</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
+
+	<properties>
+		<spring-data-elasticsearch.version>5.1.1</spring-data-elasticsearch.version>
+		<elasticsearch.version>8.7.1</elasticsearch.version>
+		<!--
+			AWS currently only supports up to 7.10.2. For later versions you need to use Elastic cloud.
+			N.B. 1. Make sure spring-data-elasticsearch.version and elasticsearch.version are compatible
+			     2. Remember to keep test version in sync in TestConfiguration.ELASTIC_SEARCH_VERSION
+		-->
+		<github.global.server>github</github.global.server>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.source>${java.version}</maven.compiler.source>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-elasticsearch</artifactId>
+			<version>${spring-data-elasticsearch.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>net.jodah</groupId>
+			<artifactId>typetools</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+		</dependency>
 
         <!-- Test Dependencies -->
         <dependency>

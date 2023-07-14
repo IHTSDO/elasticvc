@@ -1,14 +1,14 @@
 package io.kaicode.elasticvc.api;
 
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import io.kaicode.elasticvc.domain.DomainEntity;
-import org.elasticsearch.index.query.BoolQueryBuilder;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termQuery;
+import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
+
 
 public class MultiBranchCriteria extends BranchCriteria {
 
@@ -29,14 +29,14 @@ public class MultiBranchCriteria extends BranchCriteria {
 	}
 
 	@Override
-	public BoolQueryBuilder getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
-		BoolQueryBuilder boolQueryBuilder = boolQuery();
+	public BoolQuery.Builder getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
+		BoolQuery.Builder boolQueryBuilder = new BoolQuery.Builder();
 		if (branchCriteria.isEmpty()) {
 			// Force matching nothing
 			boolQueryBuilder.must(termQuery("path", "this-will-match-nothing"));
 		} else {
 			for (BranchCriteria branchCriterion : branchCriteria) {
-				boolQueryBuilder.should(branchCriterion.getEntityBranchCriteria(entityClass));
+				boolQueryBuilder.should(branchCriterion.getEntityBranchCriteria(entityClass).build()._toQuery());
 			}
 		}
 		return boolQueryBuilder;
