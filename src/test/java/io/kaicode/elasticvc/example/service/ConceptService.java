@@ -7,19 +7,18 @@ import io.kaicode.elasticvc.api.VersionControlHelper;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termQuery;
+import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.bool;
+import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
 
 @Service
 public class ConceptService extends ComponentService {
@@ -34,7 +33,7 @@ public class ConceptService extends ComponentService {
 
 	// Used to search
 	@Autowired
-	private ElasticsearchRestTemplate elasticsearchRestTemplate;
+	private ElasticsearchTemplate elasticsearchTemplate;
 
 	// Example domain entity repository
 	@Autowired
@@ -60,15 +59,15 @@ public class ConceptService extends ComponentService {
 		BranchCriteria branchCriteria = versionControlHelper.getBranchCriteria(branchPath);
 
 		// Create a query
-		NativeSearchQuery nativeSearchQuery = new NativeSearchQueryBuilder()
-				.withQuery(boolQuery()
+		NativeQuery NativeQuery = new NativeQueryBuilder()
+				.withQuery(bool(b -> b
 						// Always include the branch criteria
 						.must(branchCriteria.getEntityBranchCriteria(Concept.class))
 						// Also add any other required clauses
-						.must(termQuery(Concept.FIELD_ID, id))
+						.must(termQuery(Concept.FIELD_ID, id)))
 				).build();
 		List<Concept> concepts = new ArrayList<>();
-		SearchHits<Concept> response = elasticsearchRestTemplate.search(nativeSearchQuery, Concept.class, elasticsearchRestTemplate.getIndexCoordinatesFor(Concept.class));
+		SearchHits<Concept> response = elasticsearchTemplate.search(NativeQuery, Concept.class, elasticsearchTemplate.getIndexCoordinatesFor(Concept.class));
 		response.stream().forEach(hit -> concepts.add(hit.getContent()));
 		return !concepts.isEmpty() ? concepts.get(0) : null;
 	}

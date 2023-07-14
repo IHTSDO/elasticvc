@@ -1,17 +1,17 @@
 package io.kaicode.elasticvc.api;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import net.jodah.typetools.TypeResolver;
-import org.elasticsearch.common.util.set.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
@@ -36,21 +36,21 @@ public class ComponentService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
-	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchRestTemplate elasticsearchRestTemplate, Class<?>... persistentClass) {
+	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Class<?>... persistentClass) {
 		logger.info("Initialising indices");
 		Set<Class<?>> classes = Sets.newHashSet(persistentClass);
 		classes.add(Branch.class);
 		if (deleteExisting) {
 			logger.info("Deleting indices");
 			for (Class<?> aClass : classes) {
-				IndexCoordinates index = elasticsearchRestTemplate.getIndexCoordinatesFor(aClass);
+				IndexCoordinates index = elasticsearchOperations.getIndexCoordinatesFor(aClass);
 				logger.info("Deleting index {}", index.getIndexName());
-				elasticsearchRestTemplate.indexOps(index).delete();
+				elasticsearchOperations.indexOps(index).delete();
 			}
 		}
 		for (Class<?> aClass : classes) {
-			IndexCoordinates index = elasticsearchRestTemplate.getIndexCoordinatesFor(aClass);
-			IndexOperations indexOperations = elasticsearchRestTemplate.indexOps(index);
+			IndexCoordinates index = elasticsearchOperations.getIndexCoordinatesFor(aClass);
+			IndexOperations indexOperations = elasticsearchOperations.indexOps(index);
 			if (!indexOperations.exists()) {
 				logger.info("Creating index {}", index.getIndexName());
 				indexOperations.create();

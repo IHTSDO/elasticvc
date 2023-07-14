@@ -1,18 +1,20 @@
 package io.kaicode.elasticvc.api;
 
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import io.kaicode.elasticvc.domain.DomainEntity;
-import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 
 import java.util.*;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termsQuery;
+import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
+import static io.kaicode.elasticvc.helper.QueryHelper.termsQuery;
 
 public class BranchCriteria {
 
 	private final String branchPath;
 	private final Date timepoint;
-	private BoolQueryBuilder branchCriteria;
+	private Query branchCriteria;
 	private Map<String, Set<String>> allEntityVersionsReplaced;
 	private List<String> excludeContentFromPath;
 
@@ -21,25 +23,26 @@ public class BranchCriteria {
 		this.timepoint = timepoint;
 	}
 
-	public BranchCriteria(String branchPath, BoolQueryBuilder branchCriteria, Map<String, Set<String>> allEntityVersionsReplaced, Date timepoint) {
+	public BranchCriteria(String branchPath, Query branchCriteria, Map<String, Set<String>> allEntityVersionsReplaced, Date timepoint) {
 		this(branchPath, timepoint);
 		this.branchCriteria = branchCriteria;
 		this.allEntityVersionsReplaced = allEntityVersionsReplaced;
 	}
 
-	public BoolQueryBuilder getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
-		BoolQueryBuilder boolQueryBuilder = boolQuery().must(branchCriteria);
+
+	public Query getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
+		BoolQuery.Builder builder = bool().must(branchCriteria);
 
 		if (allEntityVersionsReplaced != null && !allEntityVersionsReplaced.isEmpty()) {
 			Set<String> values = allEntityVersionsReplaced.get(entityClass.getSimpleName());
 			if (values != null && !values.isEmpty()) {
-				boolQueryBuilder.mustNot(termsQuery("_id", values));
+				builder.mustNot(termsQuery("_id", values));
 			}
 		}
 		if (excludeContentFromPath != null && !excludeContentFromPath.isEmpty()) {
-			boolQueryBuilder.mustNot(termsQuery("path", excludeContentFromPath));
+			builder.mustNot(termsQuery("path", excludeContentFromPath));
 		}
-		return boolQueryBuilder;
+		return builder.build()._toQuery();
 	}
 
 	public void excludeContentFromPath(String path) {
