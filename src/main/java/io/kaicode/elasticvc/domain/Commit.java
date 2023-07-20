@@ -138,6 +138,6 @@ public class Commit implements AutoCloseable {
 	}
 
 	public enum CommitType {
-		CONTENT, REBASE, PROMOTION;
+		CONTENT, REBASE, PROMOTION
 	}
 }

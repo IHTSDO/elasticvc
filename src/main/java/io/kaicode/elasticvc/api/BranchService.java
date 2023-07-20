@@ -37,6 +37,7 @@ import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
 import static co.elastic.clients.json.JsonData.*;
 import static io.kaicode.elasticvc.api.VersionControlHelper.LARGE_PAGE;
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
+import static java.util.stream.Collectors.toList;
 
 @Service
 public class BranchService {
@@ -53,10 +54,9 @@ public class BranchService {
 
 	private final List<CommitListener> commitListeners;
 
-	private final Integer branchLockSyncObject = 0;
+	private final Object branchLockSyncObject = new Object();
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
-	private BoolQuery qb;
 
 	public BranchService(@Autowired ObjectMapper objectMapper) {
 		commitListeners = new ArrayList<>();
@@ -71,10 +71,12 @@ public class BranchService {
 		return doCreate(path, false, new Date(), new Metadata(metadataMap), null);
 	}
 
+	@SuppressWarnings("unused")
 	public void createAtBaseTimepoint(String path, Date specificBaseTimepoint) {
 		doCreate(path, false, new Date(), null, specificBaseTimepoint);
 	}
 
+	@SuppressWarnings("unused")
 	public Branch recursiveCreate(String path) {
 		return doCreate(path, true, new Date(), null, null);
 	}
@@ -139,7 +141,7 @@ public class BranchService {
 	public Branch findLatest(String path) {
 		NativeQuery query = getBranchQuery(path, true);
 		SearchHits<Branch> results = elasticsearchOperations.search(query, Branch.class);
-		final List<Branch> branches = results.stream().map(r -> r.getContent()).collect(Collectors.toList());
+		final List<Branch> branches = results.stream().map(SearchHit::getContent).toList();
 		Branch branch = null;
 		Branch parentBranch = null;
 
@@ -222,8 +224,6 @@ public class BranchService {
 	}
 
 	public Branch findFirstVersionOrThrow(String path) {
-		NativeQuery query = NativeQuery.builder().withSort(b -> b.field(fb -> fb.field("message").order(SortOrder.Asc)))
-				.build();
 		List<Branch> branchVersions = elasticsearchOperations.search(
 				new NativeQueryBuilder()
 						.withQuery(termQuery("path", path))
@@ -237,6 +237,7 @@ public class BranchService {
 		return updatePublicMetadata(branchVersions.iterator().next());
 	}
 
+	@SuppressWarnings("unused")
 	public Page<Branch> findAllVersions(String path, Pageable pageable) {
 		SearchHits<Branch> results = elasticsearchOperations.search(
 				new NativeQueryBuilder()
@@ -245,7 +246,7 @@ public class BranchService {
 						.withPageable(pageable)
 						.build(), Branch.class);
 
-		return new PageImpl<>(results.get().map(SearchHit::getContent).map(this::updatePublicMetadata).collect(Collectors.toList()), pageable, results.getTotalHits());
+		return new PageImpl<>(results.get().map(SearchHit::getContent).map(this::updatePublicMetadata).collect(toList()), pageable, results.getTotalHits());
 	}
 
 	public Branch findAtTimepointOrThrow(String path, Date timepoint) {
@@ -311,11 +312,12 @@ public class BranchService {
 			Branch parent = findBranchOrThrow(path);
 			return children.stream()
 					.filter(parent::isParent)
-					.collect(Collectors.toList());
+					.collect(toList());
 		}
 		return children;
 	}
 
+	@SuppressWarnings("unused")
 	public boolean branchesHaveParentChildRelationship(Branch branchA, Branch branchB) {
 		return branchA.isParent(branchB) || branchB.isParent(branchA);
 	}
@@ -359,6 +361,7 @@ public class BranchService {
 		return save(branch);
 	}
 
+	@SuppressWarnings("unused")
 	public Branch updateMetadata(String path, Metadata metadata) {
 		return updateMetadata(path, metadata.getAsMap());
 	}
@@ -377,6 +380,7 @@ public class BranchService {
 		return doOpenRebaseCommit(path, lockMetadata, null);
 	}
 
+	@SuppressWarnings("unused")
 	public Commit openRebaseToSpecificParentTimepointCommit(String path, Date specificParentTimepoint, String lockMetadata) {
 		return doOpenRebaseCommit(path, lockMetadata, specificParentTimepoint);
 	}
@@ -627,6 +631,7 @@ public class BranchService {
 		}
 	}
 
+	@SuppressWarnings("unused")
 	public void addCommitListener(CommitListener commitListener) {
 		if (!commitListeners.contains(commitListener)) {
 			commitListeners.add(commitListener);
@@ -647,6 +652,7 @@ public class BranchService {
 	 * Get unmodifiable list of commit listeners. To add a listener use the addCommitListener method.
 	 * @return unmodifiable list of commit listeners.
 	 */
+	@SuppressWarnings("unused")
 	public List<CommitListener> getCommitListeners() {
 		return Collections.unmodifiableList(commitListeners);
 	}

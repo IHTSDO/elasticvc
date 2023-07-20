@@ -53,7 +53,7 @@ public class Branch extends Entity {
 	private BranchState state;
 
 	public enum BranchState {
-		UP_TO_DATE, FORWARD, BEHIND, DIVERGED;
+		UP_TO_DATE, FORWARD, BEHIND, DIVERGED
 
 	}
 

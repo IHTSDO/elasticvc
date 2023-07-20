@@ -17,8 +17,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static io.kaicode.elasticvc.domain.Branch.BranchState.*;
-import static org.junit.Assert.*;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 public class BranchServiceTest extends AbstractTest {

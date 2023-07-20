@@ -17,7 +17,7 @@ abstract class AbstractTest {
 	@Autowired
 	ElasticsearchTemplate elasticsearchTemplate;
 
-	private static ElasticsearchContainer elasticsearchContainer = TestConfiguration.getElasticsearchContainerInstance();
+	private static final ElasticsearchContainer elasticsearchContainer = TestConfiguration.getElasticsearchContainerInstance();
 
 	@BeforeAll
 	static void setUp() {

@@ -10,6 +10,7 @@ import java.util.List;
 import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
 
 
+@SuppressWarnings("unused")
 public class MultiBranchCriteria extends BranchCriteria {
 
 	private List<BranchCriteria> branchCriteria;

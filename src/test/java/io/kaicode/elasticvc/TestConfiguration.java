@@ -35,7 +35,7 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.7.1";
 
 	@Container
-	private static ElasticsearchContainer elasticsearchContainer;
+	private static final ElasticsearchContainer elasticsearchContainer;
 
 	static {
 		elasticsearchContainer = new SnowstormElasticsearchContainer();

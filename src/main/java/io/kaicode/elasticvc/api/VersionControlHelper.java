@@ -228,11 +228,11 @@ public class VersionControlHelper {
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
 						// Add other should clauses for other branches
 						branchCriteria.should(bool(b -> b
-								.must(termQuery("path", branchTimeRange.getPath()))
-								.must(range(rq -> rq.field("start").gt(of(branchTimeRange.getStart().getTime()))))
+								.must(termQuery("path", branchTimeRange.path()))
+								.must(range(rq -> rq.field("start").gt(of(branchTimeRange.start().getTime()))))
 								.must(bool(bq -> bq
 												.should(bool(sb -> sb.mustNot(exists(eq -> eq.field("end")))))
-												.should(range(rq -> rq.field("end").lte(of(branchTimeRange.getEnd().getTime()))))
+												.should(range(rq -> rq.field("end").lte(of(branchTimeRange.end().getTime()))))
 										)
 								)));
 					}
@@ -406,28 +406,5 @@ public class VersionControlHelper {
 		UNPROMOTED_CHANGES_ON_THIS_BRANCH
 	}
 
-	private static final class BranchTimeRange {
-
-		private final String path;
-		private final Date start;
-		private final Date end;
-
-		BranchTimeRange(String path, Date start, Date end) {
-			this.path = path;
-			this.start = start;
-			this.end = end;
-		}
-
-		public String getPath() {
-			return path;
-		}
-
-		public Date getStart() {
-			return start;
-		}
-
-		public Date getEnd() {
-			return end;
-		}
-	}
+	private record BranchTimeRange(String path, Date start, Date end) {}
 }
