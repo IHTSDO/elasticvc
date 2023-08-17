@@ -159,101 +159,89 @@ public class VersionControlHelper {
 		branchCriteria.should(thisBranchShouldClause);
 
 		Map<String, Set<String>> allEntityVersionsReplaced = null;
-		switch (contentSelection) {
-			case STANDARD_SELECTION:
-				// On this branch and started and (not ended or ended later)
-				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
-				thisBranchShouldClause.must(boolQuery()
-					.should(boolQuery().mustNot(existsQuery("end")))
-					.should(rangeQuery("end").gt(timepoint.getTime())));
+        switch (contentSelection) {
+            case STANDARD_SELECTION -> {
+                // On this branch and started and (not ended or ended later)
+                thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
+                thisBranchShouldClause.must(boolQuery()
+                        .should(boolQuery().mustNot(existsQuery("end")))
+                        .should(rangeQuery("end").gt(timepoint.getTime())));
 
-				// Or any parent branch within time constraints
-				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
-				break;
+                // Or any parent branch within time constraints
+                allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+            }
+            case STANDARD_SELECTION_BEFORE_THIS_COMMIT -> {
+                // On this branch and started not ended
+                thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
+                thisBranchShouldClause.must(
+                        boolQuery()
+                                .should(boolQuery().mustNot(existsQuery("end")))
+                                .should(termQuery("end", commit.getTimepoint().getTime()))
+                );
+                // Or any parent branch within time constraints
+                allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+            }
+            case CHANGES_ON_THIS_BRANCH_ONLY ->
+                // On this branch and started not ended
+                    thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()))
+                            .mustNot(existsQuery("end"));
+            case CHANGES_IN_THIS_COMMIT_ONLY ->
+                // On this branch and started at commit date, not ended
+                    thisBranchShouldClause.must(termQuery("start", timepoint.getTime()))
+                            .mustNot(existsQuery("end"));
+            case CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY -> {
+                // On this branch and started at commit date, not ended
+                thisBranchShouldClause.must(boolQuery()
+                        .should(termQuery("start", timepoint.getTime()))
+                        .should(termQuery("end", timepoint.getTime())));
+                // Include versions just deleted in this commit, from any ancestor
+                branchCriteria.should(termsQuery("_id", commit.getEntityVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
+                if (commit != null && commit.isRebase()) {
 
-			case STANDARD_SELECTION_BEFORE_THIS_COMMIT:
-				// On this branch and started not ended
-				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()));
-				thisBranchShouldClause.must(
-						boolQuery()
-								.should(boolQuery().mustNot(existsQuery("end")))
-								.should(termQuery("end", commit.getTimepoint().getTime()))
-				);
-				// Or any parent branch within time constraints
-				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
-				break;
+                    // A rebase commit also includes all the changes
+                    // between the previous and new base timepoints on all ancestor branches
 
-			case CHANGES_ON_THIS_BRANCH_ONLY:
-				// On this branch and started not ended
-				thisBranchShouldClause.must(rangeQuery("start").lte(timepoint.getTime()))
-						.mustNot(existsQuery("end"));
-				break;
+                    // Collect previous and new base timepoints on all ancestor branches
+                    List<BranchTimeRange> branchTimeRanges = new ArrayList<>();
+                    Date tempBase = commit.getRebasePreviousBase();
+                    String parentPath = branch.getPath();
+                    while ((parentPath = PathUtil.getParentPath(parentPath)) != null) {
+                        Branch latestVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, commit.getTimepoint());
+                        branchTimeRanges.add(new BranchTimeRange(parentPath, tempBase, latestVersionOfParent.getHead()));
 
-			case CHANGES_IN_THIS_COMMIT_ONLY:
-				// On this branch and started at commit date, not ended
-				thisBranchShouldClause.must(termQuery("start", timepoint.getTime()))
-						.mustNot(existsQuery("end"));
-				break;
+                        Branch baseVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, tempBase);
+                        tempBase = baseVersionOfParent.getBase();
+                    }
 
-			case CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY:
-				// On this branch and started at commit date, not ended
-				thisBranchShouldClause.must(boolQuery()
-						.should(termQuery("start", timepoint.getTime()))
-						.should(termQuery("end", timepoint.getTime())));
-				// Include versions just deleted in this commit, from any ancestor
-				branchCriteria.should(termsQuery("_id", commit.getEntityVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
-
-				if (commit != null && commit.isRebase()) {
-
-					// A rebase commit also includes all the changes
-					// between the previous and new base timepoints on all ancestor branches
-
-					// Collect previous and new base timepoints on all ancestor branches
-					List<BranchTimeRange> branchTimeRanges = new ArrayList<>();
-					Date tempBase = commit.getRebasePreviousBase();
-					String parentPath = branch.getPath();
-					while ((parentPath = PathUtil.getParentPath(parentPath)) != null) {
-						Branch latestVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, commit.getTimepoint());
-						branchTimeRanges.add(new BranchTimeRange(parentPath, tempBase, latestVersionOfParent.getHead()));
-
-						Branch baseVersionOfParent = branchService.findAtTimepointOrThrow(parentPath, tempBase);
-						tempBase = baseVersionOfParent.getBase();
-					}
-
-					// Add all branch time ranges to selection criteria
-					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
-						// Add other should clauses for other branches
-						branchCriteria.should(boolQuery()
-								.must(termQuery("path", branchTimeRange.getPath()))
-								.must(rangeQuery("start").gt(branchTimeRange.getStart().getTime()))
-								.must(boolQuery()
-										.should(boolQuery().mustNot(existsQuery("end")))
-										.should(rangeQuery("end").lte(branchTimeRange.getEnd().getTime()))
-								)
-						);
-					}
-				}
-
-				break;
-
-			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH: {
-				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
-				thisBranchShouldClause.must(boolQuery()
-						.should(rangeQuery("start").gte(startPoint.getTime()))
-						.should(rangeQuery("end").gte(startPoint.getTime())));
-				// Include versions deleted on this branch, from any ancestor
-				branchCriteria.should(termsQuery("_id", branch.getVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
-			}
-			break;
-
-			case UNPROMOTED_CHANGES_ON_THIS_BRANCH: {
-				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
-				thisBranchShouldClause
-						.must(rangeQuery("start").gte(startPoint.getTime()))
-						.mustNot(existsQuery("end"));
-			}
-			break;
-		}
+                    // Add all branch time ranges to selection criteria
+                    for (BranchTimeRange branchTimeRange : branchTimeRanges) {
+                        // Add other should clauses for other branches
+                        branchCriteria.should(boolQuery()
+                                .must(termQuery("path", branchTimeRange.getPath()))
+                                .must(rangeQuery("start").gt(branchTimeRange.getStart().getTime()))
+                                .must(boolQuery()
+                                        .should(boolQuery().mustNot(existsQuery("end")))
+                                        .should(rangeQuery("end").lte(branchTimeRange.getEnd().getTime()))
+                                )
+                        );
+                    }
+                }
+            }
+            case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH -> {
+                Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
+                thisBranchShouldClause.must(boolQuery()
+                        .should(rangeQuery("start").gte(startPoint.getTime()))
+                        .should(rangeQuery("end").gte(startPoint.getTime())));
+                // Include versions deleted on this branch, from any ancestor
+                branchCriteria.should(termsQuery("_id", branch.getVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
+            }
+            case UNPROMOTED_CHANGES_ON_THIS_BRANCH -> {
+                Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
+                thisBranchShouldClause
+                        .must(rangeQuery("start").gte(startPoint.getTime()))
+                        .mustNot(existsQuery("end"));
+            }
+        }
 		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
 		BoolQueryBuilder must = boolQuery().must(branchCriteria);
 		return new BranchCriteria(branch.getPath(), must, allEntityVersionsReplaced, timepoint);
@@ -315,9 +303,7 @@ public class VersionControlHelper {
 
 		Set<String> versionsReplaced = new HashSet<>();
 		try (final SearchHitsIterator<T> replacedVersions = elasticsearchRestTemplate.searchForStream(query2, entityClass)) {
-			replacedVersions.forEachRemaining(version -> {
-				versionsReplaced.add(version.getContent().getInternalId());
-			});
+			replacedVersions.forEachRemaining(version -> versionsReplaced.add(version.getContent().getInternalId()));
 		}
 		commit.addVersionsReplaced(versionsReplaced, entityClass);
 
