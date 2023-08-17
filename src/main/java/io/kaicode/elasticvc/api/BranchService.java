@@ -137,7 +137,7 @@ public class BranchService {
 	public Branch findLatest(String path) {
 		NativeSearchQuery query = getBranchQuery(path, true);
 		SearchHits<Branch> results = elasticsearchRestTemplate.search(query, Branch.class);
-		final List<Branch> branches = results.stream().map(r -> r.getContent()).collect(Collectors.toList());
+		final List<Branch> branches = results.stream().map(SearchHit::getContent).toList();
 		Branch branch = null;
 		Branch parentBranch = null;
 
@@ -227,7 +227,7 @@ public class BranchService {
 						.withSort(SortBuilders.fieldSort("start"))
 						.withPageable(PageRequest.of(0, 1))
 						.build(), Branch.class)
-				.stream().map(SearchHit::getContent).collect(Collectors.toList());
+				.stream().map(SearchHit::getContent).toList();
 		if (branchVersions.isEmpty()) {
 			throw new BranchNotFoundException("Branch '" + path + "' does not exist.");
 		}
@@ -613,7 +613,7 @@ public class BranchService {
 					)
 				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class)
-				.stream().map(SearchHit::getContent).collect(Collectors.toList());
+				.stream().map(SearchHit::getContent).toList();
 
 		if (!branches.isEmpty()) {
 			final Branch branch = branches.get(0);
