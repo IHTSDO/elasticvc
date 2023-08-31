@@ -3,8 +3,7 @@ package io.kaicode.elasticvc.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class Metadata {
 
@@ -33,6 +32,12 @@ public class Metadata {
 
 	public String getString(String key) {
 		return (String) internalMap.get(key);
+	}
+
+	public List<String> getList(String key) {
+		@SuppressWarnings("unchecked")
+		final List<String> list = (List<String>) internalMap.get(key);
+		return list;
 	}
 
 	public Metadata putMap(String key, Map<String, String> value) {
