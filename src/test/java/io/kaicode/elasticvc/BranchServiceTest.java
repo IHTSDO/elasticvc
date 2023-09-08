@@ -130,7 +130,7 @@ public class BranchServiceTest extends AbstractTest {
 		meta.put("test", "123");
 		branchService.create("MAIN", meta);
 
-		Map mapping = indexOps.getMapping();
+		Map<String, Object> mapping = indexOps.getMapping();
 		System.out.println(mapping);
 
 		Date mainACreationDate = branchService.create("MAIN/A").getCreation();
