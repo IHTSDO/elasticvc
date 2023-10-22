@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.index.Settings;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,8 @@ public class ComponentService {
 			IndexOperations indexOperations = elasticsearchOperations.indexOps(index);
 			if (!indexOperations.exists()) {
 				logger.info("Creating index {}", index.getIndexName());
-				indexOperations.create();
+				Settings settings = indexOperations.createSettings(aClass);
+				indexOperations.create(settings);
 				indexOperations.putMapping(indexOperations.createMapping(aClass));
 			}
 		}

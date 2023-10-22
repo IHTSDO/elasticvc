@@ -9,6 +9,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.elasticsearch.core.index.Settings;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 
 import java.util.Collections;
 
@@ -157,6 +159,16 @@ class ConceptExampleTest extends AbstractTest {
 		branchVersion = branchService.findLatest(branchPath);
 		assertEquals(branchVersionBeforeUpdate.getHead(), branchVersion.getHead(), "The head timepoint should now match the previous commit.");
 		assertEquals(Collections.emptySet(), branchVersion.getVersionsReplaced().get("Concept"), "There should now be no versions replaced on MAIN/A because the commit was rolled back.");
+	}
+
+
+	@Test
+	void testIndexConfigs() {
+		IndexCoordinates indexCoordinates = elasticsearchOperations.getIndexCoordinatesFor(Concept.class);
+		assertEquals("test_concept", indexCoordinates.getIndexName());
+		Settings settings = elasticsearchOperations.indexOps(indexCoordinates).getSettings();
+		assertEquals("3", settings.getString("index.number_of_shards"));
+		assertEquals("1", settings.getString("index.number_of_replicas"));
 	}
 
 	@AfterEach

@@ -1,9 +1,9 @@
 package io.kaicode.elasticvc;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.example.domain.Concept;
+import io.kaicode.elasticvc.repositories.config.IndexNameProvider;
 import jakarta.annotation.PostConstruct;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +71,11 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 			addEnv("xpack.security.enabled", "false");
 			this.addEnv("cluster.name", "integration-test-cluster");
 		}
+	}
+
+	@Bean
+	public IndexNameProvider indexNameProvider() {
+		return new IndexNameProvider("test_");
 	}
 
 	@Bean
