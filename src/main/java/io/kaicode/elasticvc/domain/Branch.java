@@ -5,10 +5,12 @@ import org.springframework.data.annotation.Transient;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.Setting;
 
 import java.util.*;
 
-@Document(indexName = "branch")
+@Document(indexName = "#{@indexNameProvider.indexName('branch')}")
+@Setting(settingPath = "elasticsearch-settings.json")
 public class Branch extends Entity {
 	public interface Fields {
 		String PATH = "path";
@@ -53,7 +55,7 @@ public class Branch extends Entity {
 	private BranchState state;
 
 	public enum BranchState {
-		UP_TO_DATE, FORWARD, BEHIND, DIVERGED;
+		UP_TO_DATE, FORWARD, BEHIND, DIVERGED
 
 	}
 

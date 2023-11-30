@@ -11,14 +11,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.index.Settings;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static io.kaicode.elasticvc.domain.Branch.BranchState.*;
-import static org.junit.Assert.*;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 public class BranchServiceTest extends AbstractTest {
@@ -124,7 +125,7 @@ public class BranchServiceTest extends AbstractTest {
 
 	@Test
 	public void testBranchState() {
-		IndexOperations indexOps = elasticsearchRestTemplate.indexOps(Branch.class);
+		IndexOperations indexOps = elasticsearchOperations.indexOps(Branch.class);
 		indexOps.putMapping(indexOps.createMapping(Branch.class));
 		Map<String, Object> meta = new HashMap<>();
 		meta.put("test", "123");
@@ -278,6 +279,14 @@ public class BranchServiceTest extends AbstractTest {
 		assertEquals(mergedMetadata, branchService.findBranchOrThrow("MAIN/one/two", true).getMetadata().getAsMap());
 	}
 
+	@Test
+	void testIndexConfigs() {
+		IndexCoordinates indexCoordinates = elasticsearchOperations.getIndexCoordinatesFor(Branch.class);
+		assertEquals("test_branch", indexCoordinates.getIndexName());
+		Settings settings = elasticsearchOperations.indexOps(indexCoordinates).getSettings();
+		assertEquals("1", settings.getString("index.number_of_shards"));
+		assertEquals("1", settings.getString("index.number_of_replicas"));
+	}
 	private void assertBranchState(String path, Branch.BranchState status) {
 		assertEquals(status, branchService.findLatest(path).getState());
 	}
