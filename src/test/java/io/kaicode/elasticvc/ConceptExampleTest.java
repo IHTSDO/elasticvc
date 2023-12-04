@@ -9,11 +9,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.index.Settings;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 
 import java.util.Collections;
 
+import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.bool;
+import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -161,6 +166,27 @@ class ConceptExampleTest extends AbstractTest {
 		assertEquals(Collections.emptySet(), branchVersion.getVersionsReplaced().get("Concept"), "There should now be no versions replaced on MAIN/A because the commit was rolled back.");
 	}
 
+
+	@Test
+	void testFetchFieldsOnlyWithSourceFilter() {
+		// Create concept
+		branchService.create("MAIN");
+		Concept conceptBeforeSave = new Concept("1", "Concept 1");
+		conceptService.createUpdateConcept(conceptBeforeSave, "MAIN");
+		NativeQueryBuilder queryBuilder = new NativeQueryBuilder();
+		// After upgrading to 5.1.16 withFields is no longer working as expected
+		// Use withSourceFilter instead
+		queryBuilder.withSourceFilter(new FetchSourceFilter(new String[]{Concept.FIELD_ID}, null));
+		queryBuilder.withQuery(bool(b -> b.must(termQuery(Concept.FIELD_ID, "1"))));
+
+		SearchHits<Concept> searchHits = elasticsearchOperations.search(queryBuilder.build(), Concept.class);
+		assertEquals(1, searchHits.getTotalHits());
+		Concept concept = searchHits.getSearchHit(0).getContent();
+		assertNotNull(concept);
+		assertEquals("1", concept.getId());
+		assertNull(concept.getStart());
+		assertNull(concept.getTerm());
+	}
 
 	@Test
 	void testIndexConfigs() {
