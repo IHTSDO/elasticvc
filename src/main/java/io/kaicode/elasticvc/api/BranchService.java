@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.*;
+import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.stereotype.Service;
@@ -578,7 +579,7 @@ public class BranchService {
 					.withQuery(bool(b -> b
 							.must(termQuery("end", timestamp))
 							.must(termsQuery("path", branchPaths))))
-					.withFields("internalId")
+					.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
 					.withPageable(LARGE_PAGE).build();
 			try (final SearchHitsIterator<? extends DomainEntity> endedDocs = elasticsearchOperations.searchForStream(endedDocumentQuery, type)) {
 				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getContent().getInternalId()));

@@ -15,6 +15,7 @@ import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHitsIterator;
+import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -304,7 +305,7 @@ public class VersionControlHelper {
 						.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
 						.mustNot(termQuery("path", commit.getBranch().getPath()))))
 				.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
-				.withFields("internalId")
+				.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
 				.withPageable(LARGE_PAGE)
 				.build();
 
