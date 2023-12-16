@@ -1,6 +1,7 @@
 package io.kaicode.elasticvc;
 
 import io.kaicode.elasticvc.api.BranchService;
+import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
@@ -16,6 +17,8 @@ import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.bool;
 import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
@@ -193,8 +196,36 @@ class ConceptExampleTest extends AbstractTest {
 		IndexCoordinates indexCoordinates = elasticsearchOperations.getIndexCoordinatesFor(Concept.class);
 		assertEquals("test_concept", indexCoordinates.getIndexName());
 		Settings settings = elasticsearchOperations.indexOps(indexCoordinates).getSettings();
-		assertEquals("3", settings.getString("index.number_of_shards"));
-		assertEquals("1", settings.getString("index.number_of_replicas"));
+		assertEquals("1", settings.getString("index.number_of_shards"));
+		assertEquals("0", settings.getString("index.number_of_replicas"));
+	}
+
+	@Test
+	void testCreateIndexWithExternalConfigs() {
+		try {
+			Map<String, Object> settings = new HashMap<>();
+			settings.put("index.number_of_shards", "3");
+			settings.put("index.number_of_replicas", "1");
+			ComponentService.initialiseIndexAndMappingForPersistentClasses(
+					true,
+					elasticsearchOperations,
+					settings,
+					Concept.class
+			);
+			IndexCoordinates indexCoordinates = elasticsearchOperations.getIndexCoordinatesFor(Concept.class);
+			assertEquals("test_concept", indexCoordinates.getIndexName());
+			Settings shardSettings = elasticsearchOperations.indexOps(indexCoordinates).getSettings();
+			assertEquals("3", shardSettings.getString("index.number_of_shards"));
+			assertEquals("1", shardSettings.getString("index.number_of_replicas"));
+		} finally {
+			// Reset to default
+			ComponentService.initialiseIndexAndMappingForPersistentClasses(
+					true,
+					elasticsearchOperations,
+					null,
+					Concept.class
+			);
+		}
 	}
 
 	@AfterEach
@@ -202,5 +233,4 @@ class ConceptExampleTest extends AbstractTest {
 		branchService.deleteAll();
 		conceptService.deleteAll();
 	}
-
 }

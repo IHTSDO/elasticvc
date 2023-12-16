@@ -3,7 +3,6 @@ package io.kaicode.elasticvc.api;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import io.kaicode.elasticvc.domain.DomainEntity;
-import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 
 import java.util.*;
 

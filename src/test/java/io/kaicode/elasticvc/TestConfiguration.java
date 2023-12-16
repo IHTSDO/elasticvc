@@ -45,6 +45,7 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 		ComponentService.initialiseIndexAndMappingForPersistentClasses(
 				true,
 				elasticsearchOperations,
+				null,
 				Branch.class,
 				Concept.class
 		);
