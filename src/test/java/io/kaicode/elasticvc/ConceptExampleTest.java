@@ -192,12 +192,13 @@ class ConceptExampleTest extends AbstractTest {
 	}
 
 	@Test
-	void testIndexConfigs() {
+	void testIndexConfigsWithDefaultSettings() {
 		IndexCoordinates indexCoordinates = elasticsearchOperations.getIndexCoordinatesFor(Concept.class);
 		assertEquals("test_concept", indexCoordinates.getIndexName());
 		Settings settings = elasticsearchOperations.indexOps(indexCoordinates).getSettings();
+		// Default settings
 		assertEquals("1", settings.getString("index.number_of_shards"));
-		assertEquals("0", settings.getString("index.number_of_replicas"));
+		assertEquals("1", settings.getString("index.number_of_replicas"));
 	}
 
 	@Test
@@ -222,7 +223,6 @@ class ConceptExampleTest extends AbstractTest {
 			ComponentService.initialiseIndexAndMappingForPersistentClasses(
 					true,
 					elasticsearchOperations,
-					null,
 					Concept.class
 			);
 		}

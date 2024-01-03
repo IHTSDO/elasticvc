@@ -1,5 +1,6 @@
 package io.kaicode.elasticvc;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.example.domain.Concept;
@@ -45,7 +46,6 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 		ComponentService.initialiseIndexAndMappingForPersistentClasses(
 				true,
 				elasticsearchOperations,
-				null,
 				Branch.class,
 				Concept.class
 		);
@@ -84,6 +84,12 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 	public @NotNull ElasticsearchCustomConversions elasticsearchCustomConversions() {
 		return new ElasticsearchCustomConversions(
 				Arrays.asList(new DateToLong(), new LongToDate()));
+	}
+
+	@Bean
+	public ObjectMapper objectMapper() {
+		// Customize and configure your ObjectMapper here
+		return new ObjectMapper();
 	}
 
 	@WritingConverter
