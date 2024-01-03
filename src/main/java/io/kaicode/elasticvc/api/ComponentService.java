@@ -37,6 +37,7 @@ public class ComponentService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
+
 	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Map<String, Object> settings, Class<?>... persistentClass) {
 		logger.info("Initialising indices");
 		Set<Class<?>> classes = Sets.newHashSet(persistentClass);
@@ -62,6 +63,10 @@ public class ComponentService {
 				indexOperations.putMapping(indexOperations.createMapping(aClass));
 			}
 		}
+	}
+
+	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Class<?>... persistentClass) {
+		initialiseIndexAndMappingForPersistentClasses(deleteExisting, elasticsearchOperations, null, persistentClass);
 	}
 
 	@SuppressWarnings("unchecked")
