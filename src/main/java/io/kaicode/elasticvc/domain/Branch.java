@@ -8,7 +8,7 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.util.*;
 
-@Document(indexName = "#{@indexNameProvider.indexName('branch')}")
+@Document(indexName = "#{@indexNameProvider.indexName('branch')}", createIndex = false)
 public class Branch extends Entity {
 	public interface Fields {
 		String PATH = "path";

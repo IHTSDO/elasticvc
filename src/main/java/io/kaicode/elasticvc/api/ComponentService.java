@@ -39,9 +39,9 @@ public class ComponentService {
 
 
 	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Map<String, Object> settings, Class<?>... persistentClass) {
-		logger.info("Initialising indices");
 		Set<Class<?>> classes = Sets.newHashSet(persistentClass);
 		classes.add(Branch.class);
+		logger.info("Initialising {} indices", classes.size());
 		if (deleteExisting) {
 			logger.info("Deleting indices");
 			for (Class<?> aClass : classes) {
