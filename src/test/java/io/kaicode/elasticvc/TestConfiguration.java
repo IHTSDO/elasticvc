@@ -31,7 +31,7 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 	@Autowired
 	private ElasticsearchOperations elasticsearchOperations;
 
-	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.7.1";
+	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.11.1";
 
 	@Container
 	private static final ElasticsearchContainer elasticsearchContainer;
