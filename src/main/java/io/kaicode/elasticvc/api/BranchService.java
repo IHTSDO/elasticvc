@@ -36,7 +36,7 @@ import static co.elastic.clients.json.JsonData.*;
 import static io.kaicode.elasticvc.api.VersionControlHelper.LARGE_PAGE;
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
 import static java.util.stream.Collectors.toList;
-import static org.springframework.data.elasticsearch.core.ScriptType.INLINE;
+import static org.springframework.data.elasticsearch.core.query.ScriptType.INLINE;
 
 @Service
 public class BranchService {

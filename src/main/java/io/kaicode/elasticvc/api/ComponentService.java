@@ -13,13 +13,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
-import org.springframework.data.elasticsearch.core.index.Settings;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,10 +37,11 @@ public class ComponentService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ComponentService.class);
 
-	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Class<?>... persistentClass) {
-		logger.info("Initialising indices");
+
+	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Map<String, Object> settings, Class<?>... persistentClass) {
 		Set<Class<?>> classes = Sets.newHashSet(persistentClass);
 		classes.add(Branch.class);
+		logger.info("Initialising {} indices", classes.size());
 		if (deleteExisting) {
 			logger.info("Deleting indices");
 			for (Class<?> aClass : classes) {
@@ -54,17 +55,24 @@ public class ComponentService {
 			IndexOperations indexOperations = elasticsearchOperations.indexOps(index);
 			if (!indexOperations.exists()) {
 				logger.info("Creating index {}", index.getIndexName());
-				Settings settings = indexOperations.createSettings(aClass);
-				indexOperations.create(settings);
+				if (settings == null || settings.isEmpty()) {
+					indexOperations.create(indexOperations.createSettings(aClass));
+				} else {
+					indexOperations.create(settings);
+				}
 				indexOperations.putMapping(indexOperations.createMapping(aClass));
 			}
 		}
 	}
 
+	public static void initialiseIndexAndMappingForPersistentClasses(boolean deleteExisting, ElasticsearchOperations elasticsearchOperations, Class<?>... persistentClass) {
+		initialiseIndexAndMappingForPersistentClasses(deleteExisting, elasticsearchOperations, null, persistentClass);
+	}
+
 	@SuppressWarnings("unchecked")
-	/**
-	 * Saves components within commit.
-	 * @return The saved components with updated metadata not including those which were deleted.
+	/*
+	  Saves components within commit.
+	  @return The saved components with updated metadata not including those which were deleted.
 	 */
 	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchRepository<C, String> repository) {
 		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchRepository.class, repository.getClass());

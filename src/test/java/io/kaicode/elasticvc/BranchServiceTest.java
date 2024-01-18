@@ -58,20 +58,11 @@ public class BranchServiceTest extends AbstractTest {
 		assertEquals("MAIN/A", a.getPath());
 		assertEquals(UP_TO_DATE, a.getState());
 
+		assertThrows(IllegalArgumentException.class, () -> branchService.create("123"));
+
+		assertThrows(IllegalArgumentException.class, () -> branchService.create("MAIN.abc"));
+
 		assertNotNull(branchService.findLatest("MAIN"));
-
-		try {
-			branchService.create("123");
-			fail("Expected an exception.");
-		} catch (IllegalArgumentException e) {
-
-		}
-		try {
-			branchService.create("MAIN.abc");
-			fail("Expected an exception.");
-		} catch (IllegalArgumentException e) {
-
-		}
 		branchService.create("MAIN/abc");
 	}
 

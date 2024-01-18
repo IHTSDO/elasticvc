@@ -1,5 +1,6 @@
 package io.kaicode.elasticvc;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.example.domain.Concept;
@@ -30,7 +31,7 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 	@Autowired
 	private ElasticsearchOperations elasticsearchOperations;
 
-	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.7.1";
+	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.11.1";
 
 	@Container
 	private static final ElasticsearchContainer elasticsearchContainer;
@@ -83,6 +84,12 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 	public @NotNull ElasticsearchCustomConversions elasticsearchCustomConversions() {
 		return new ElasticsearchCustomConversions(
 				Arrays.asList(new DateToLong(), new LongToDate()));
+	}
+
+	@Bean
+	public ObjectMapper objectMapper() {
+		// Customize and configure your ObjectMapper here
+		return new ObjectMapper();
 	}
 
 	@WritingConverter
