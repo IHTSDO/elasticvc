@@ -178,7 +178,7 @@ class ConceptExampleTest extends AbstractTest {
 		NativeQueryBuilder queryBuilder = new NativeQueryBuilder();
 		// After upgrading to 5.1.16 withFields is no longer working as expected
 		// Use withSourceFilter instead
-		queryBuilder.withSourceFilter(new FetchSourceFilter(new String[] { Concept.FIELD_ID }, null));
+		queryBuilder.withSourceFilter(new FetchSourceFilter(new String[]{Concept.FIELD_ID}, null));
 		queryBuilder.withQuery(bool(b -> b.must(termQuery(Concept.FIELD_ID, "1"))));
 
 		SearchHits<Concept> searchHits = elasticsearchOperations.search(queryBuilder.build(), Concept.class);

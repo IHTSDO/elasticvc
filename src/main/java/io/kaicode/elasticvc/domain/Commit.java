@@ -28,7 +28,7 @@ public class Commit implements AutoCloseable {
 	 * This set is just to help with processing deletions during a commit.
 	 */
 	private final Set<String> entitiesDeleted;
-	private final Set<Class> domainEntityClasses;
+	private final Set<Class<?>> domainEntityClasses;
 
 	private final CommitType commitType;
 	private String sourceBranchPath;
@@ -47,7 +47,7 @@ public class Commit implements AutoCloseable {
 		this.onFailure = onFailure;
 	}
 
-	public <C extends DomainEntity> void addDomainEntityClass(Class<C> domainEntityClass) {
+	public <C extends DomainEntity<?>> void addDomainEntityClass(Class<C> domainEntityClass) {
 		this.domainEntityClasses.add(domainEntityClass);
 	}
 
@@ -76,7 +76,7 @@ public class Commit implements AutoCloseable {
 		return commitType;
 	}
 
-	public void addVersionsReplaced(Set<String> internalIds, Class<? extends DomainEntity> entityClass) {
+	public void addVersionsReplaced(Set<String> internalIds, Class<? extends DomainEntity<?>> entityClass) {
 		entityVersionsReplaced.computeIfAbsent(entityClass.getSimpleName(), (c) -> new HashSet<>()).addAll(internalIds);
 	}
 
@@ -125,7 +125,7 @@ public class Commit implements AutoCloseable {
 		return rebasePreviousBase;
 	}
 
-	public Set<Class> getDomainEntityClasses() {
+	public Set<Class<?>> getDomainEntityClasses() {
 		return domainEntityClasses;
 	}
 

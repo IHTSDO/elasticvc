@@ -33,6 +33,8 @@ import static io.kaicode.elasticvc.helper.QueryHelper.*;
 public class VersionControlHelper {
 
 	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
+	public static final String VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES = "vc.separate-index.entity-class-names";
+
 	@Autowired
 	private BranchService branchService;
 
@@ -167,9 +169,8 @@ public class VersionControlHelper {
 		// If any 'must' clauses are given then the 'should' clauses do not have to match in Elasticsearch.
 		// We will use a 'should' clause to select content from each branch that can match (usually this branch and ancestors).
 
-		final BoolQuery.Builder branchCriteria = bool();
+		final BoolQuery.Builder branchQueryBuilder = bool();
 		final BoolQuery.Builder thisBranchShouldClause = bool().must(termQuery("path", branch.getPath()));
-
 		Map<String, Set<String>> allEntityVersionsReplaced = null;
 		switch (contentSelection) {
 			case STANDARD_SELECTION -> {
@@ -180,7 +181,7 @@ public class VersionControlHelper {
 						.should(range(rq -> rq.field("end").gt(of(timepoint.getTime()))))
 				));
 				// Or any parent branch within time constraints
-				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced);
 			}
 			case STANDARD_SELECTION_BEFORE_THIS_COMMIT -> {
 				// On this branch and started not ended
@@ -191,7 +192,7 @@ public class VersionControlHelper {
 								.should(termQuery("end", commit.getTimepoint().getTime())))
 				);
 				// Or any parent branch within time constraints
-				allEntityVersionsReplaced = addParentCriteriaRecursively(branchCriteria, branch, versionsReplaced);
+				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced);
 			}
 			case CHANGES_ON_THIS_BRANCH_ONLY ->
 				// On this branch and started not ended
@@ -207,8 +208,8 @@ public class VersionControlHelper {
 						.should(termQuery("start", timepoint.getTime()))
 						.should(termQuery("end", timepoint.getTime()))));
 				// Include versions just deleted in this commit, from any ancestor
-				branchCriteria.should(termsQuery("_id", commit.getEntityVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
-				if (commit != null && commit.isRebase()) {
+				branchQueryBuilder.should(termsQuery("_id", commit.getEntityVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
+				if (commit.isRebase()) {
 
 					// A rebase commit also includes all the changes
 					// between the previous and new base timepoints on all ancestor branches
@@ -228,7 +229,7 @@ public class VersionControlHelper {
 					// Add all branch time ranges to selection criteria
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
 						// Add other should clauses for other branches
-						branchCriteria.should(bool(b -> b
+						branchQueryBuilder.should(bool(b -> b
 								.must(termQuery("path", branchTimeRange.path()))
 								.must(range(rq -> rq.field("start").gt(of(branchTimeRange.start().getTime()))))
 								.must(bool(bq -> bq
@@ -245,7 +246,7 @@ public class VersionControlHelper {
 						.should(range(rq -> rq.field("start").gte(of(startPoint.getTime()))))
 						.should(range(rq -> rq.field("end").gte(of(startPoint.getTime()))))));
 				// Include versions deleted on this branch, from any ancestor
-				branchCriteria.should(termsQuery("_id", branch.getVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
+				branchQueryBuilder.should(termsQuery("_id", branch.getVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
 			}
 			case UNPROMOTED_CHANGES_ON_THIS_BRANCH -> {
 				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
@@ -255,9 +256,21 @@ public class VersionControlHelper {
 			}
 		}
 		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
-		branchCriteria.should(thisBranchShouldClause.build()._toQuery());
-		Query must = branchCriteria.build()._toQuery();
-		return new BranchCriteria(branch.getPath(), must, allEntityVersionsReplaced, timepoint);
+		branchQueryBuilder.should(thisBranchShouldClause.build()._toQuery());
+		Query must = branchQueryBuilder.build()._toQuery();
+		BranchCriteria branchCriteria =  new BranchCriteria(branch.getPath(), must, allEntityVersionsReplaced, timepoint);
+		getEntityClassNamesWithSeparateIndex(branch).forEach(entityClassName -> branchCriteria.excludeEntityContentFromPaths(entityClassName, getParentPaths(branch.getPath())));
+		return branchCriteria;
+	}
+
+	private List<String> getParentPaths(String path) {
+		List<String> parents = new ArrayList<>();
+		String parentPath = PathUtil.getParentPath(path);
+		while (parentPath != null) {
+			parents.add(parentPath);
+			parentPath = PathUtil.getParentPath(parentPath);
+		}
+		return parents;
 	}
 
 	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQuery.Builder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced) {
@@ -294,37 +307,55 @@ public class VersionControlHelper {
 		}
 	}
 
-	<T extends DomainEntity<?>> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<?> ids, ElasticsearchRepository repository) {
+	<T extends DomainEntity<?>> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<?> ids, ElasticsearchRepository<T, String> repository) {
 		// End versions of the entity on this path by setting end date
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
 
-		// Hide versions of the entity on other paths from this branch
-		final NativeQuery query = new NativeQueryBuilder()
-				.withQuery(bool(b -> b
-						.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
-						.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
-						.mustNot(termQuery("path", commit.getBranch().getPath()))))
-				.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
-				.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
-				.withPageable(LARGE_PAGE)
-				.build();
+		// Skip versions hiding if entity is stored in a separate index
+		if (getEntityClassNamesWithSeparateIndex(commit.getBranch()).contains(entityClass.getSimpleName())) {
+			 logger.debug("Skipping versions hiding for {} on branch {}", entityClass.getSimpleName(), commit.getBranch().getPath());
+		} else {
+			// Hide versions of the entity on other paths from this branch
+			final NativeQuery query = new NativeQueryBuilder()
+					.withQuery(bool(b -> b
+							.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
+							.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
+							.mustNot(termQuery("path", commit.getBranch().getPath()))))
+					.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
+					.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
+					.withPageable(LARGE_PAGE)
+					.build();
 
-		Set<String> versionsReplaced = new HashSet<>();
-		try (final SearchHitsIterator<T> replacedVersions = elasticsearchOperations.searchForStream(query, entityClass)) {
-			replacedVersions.forEachRemaining(version -> versionsReplaced.add(version.getContent().getInternalId()));
+			Set<String> versionsReplaced = new HashSet<>();
+			try (final SearchHitsIterator<T> replacedVersions = elasticsearchOperations.searchForStream(query, entityClass)) {
+				replacedVersions.forEachRemaining(version -> versionsReplaced.add(version.getContent().getInternalId()));
+			}
+			commit.addVersionsReplaced(versionsReplaced, entityClass);
+
+			logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
 		}
-		commit.addVersionsReplaced(versionsReplaced, entityClass);
+	}
 
-		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
+	public Collection<String> getEntityClassNamesWithSeparateIndex(Branch branch) {
+		Map<String, Object> metaData = branch.getMetadata().getAsMap();
+		if (metaData.containsKey(VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES)) {
+			Object value = metaData.get(VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES);
+			if (value instanceof String) {
+				return List.of((String) value);
+			} else if (value instanceof Collection) {
+				return ((Collection<?>) value).stream().map(Object::toString).collect(Collectors.toList());
+			}
+		}
+		return Collections.emptyList();
 	}
 
 	@SuppressWarnings("unused")
-	public <T extends DomainEntity> void endAllVersionsOnThisBranch(Class<T> entityClass, @Nullable Query selectionClause, Commit commit, ElasticsearchRepository repository) {
+	public <T extends DomainEntity<?>> void endAllVersionsOnThisBranch(Class<T> entityClass, @Nullable Query selectionClause, Commit commit, ElasticsearchRepository<T, String> repository) {
 		endOldVersionsOnThisBranch(entityClass, null, null, selectionClause, commit, repository);
 	}
 
-	public <T extends DomainEntity> void endOldVersionsOnThisBranch(Class<T> entityClass, Collection<?> ids, String idField, Query selectionClause,
-			Commit commit, ElasticsearchRepository repository) {
+	public <T extends DomainEntity<?>> void endOldVersionsOnThisBranch(Class<T> entityClass, Collection<?> ids, String idField, Query selectionClause,
+			Commit commit, ElasticsearchRepository<T, String> repository) {
 
 		if (ids != null && ids.isEmpty()) {
 			return;

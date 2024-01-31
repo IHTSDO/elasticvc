@@ -97,13 +97,13 @@ public class Branch extends Entity {
 		}
 	}
 
-	public void addVersionsReplaced(DomainEntity entity, Set<String> internalIds) {
+	public void addVersionsReplaced(DomainEntity<?> entity, Set<String> internalIds) {
 		if (notMAIN()) {
 			versionsReplaced.computeIfAbsent(entity.getClass().getSimpleName(), (clazz) -> new HashSet<>()).addAll(internalIds);
 		}
 	}
 
-	public Set<String> getVersionsReplaced(Class<? extends DomainEntity> entityClass) {
+	public Set<String> getVersionsReplaced(Class<? extends DomainEntity<?>> entityClass) {
 		if (notMAIN()) {
 			return new HashSet<>(versionsReplaced.getOrDefault(entityClass.getSimpleName(), Collections.emptySet()));
 		} else {

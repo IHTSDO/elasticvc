@@ -502,7 +502,7 @@ public class BranchService {
 		logger.info("Rolling back commit on {} started at {}", commit.getBranch().getPath(), commit.getTimepoint().getTime());
 
 		@SuppressWarnings("unchecked")
-		Set<Class<? extends DomainEntity>> domainEntityClasses = commit.getDomainEntityClasses().stream().map(clazz -> (Class<? extends DomainEntity>) clazz).collect(Collectors.toSet());
+		Set<Class<? extends DomainEntity<?>>> domainEntityClasses = commit.getDomainEntityClasses().stream().map(clazz -> (Class<? extends DomainEntity<?>>) clazz).collect(Collectors.toSet());
 		doContentRollback(commit.getBranch().getPath(), commit.getSourceBranchPath(), commit.getTimepoint().getTime(), domainEntityClasses);
 
 		Branch branch = commit.getBranch();
@@ -524,7 +524,7 @@ public class BranchService {
 		save(branch);
 	}
 
-	public void rollbackCompletedCommit(Branch branchVersion, List<Class<? extends DomainEntity>> domainTypes) {
+	public void rollbackCompletedCommit(Branch branchVersion, List<Class<? extends DomainEntity<?>>> domainTypes) {
 		long timestamp = branchVersion.getHeadTimestamp();
 		String path = branchVersion.getPath();
 		boolean lockedInitially = branchVersion.isLocked();
@@ -555,13 +555,13 @@ public class BranchService {
 		logger.info("Completed rollback of commit {} on {}.", timestamp, path);
 	}
 
-	private void doContentRollback(String path, String promotionSourceBranch, long timestamp, Collection<Class<? extends DomainEntity>> domainTypes) {
+	private void doContentRollback(String path, String promotionSourceBranch, long timestamp, Collection<Class<? extends DomainEntity<?>>> domainTypes) {
 		logger.info("Deleting documents on {} started at {}.", path, timestamp);
 		Query deleteQuery = new NativeQueryBuilder()
 				.withQuery(bool(b -> b
 				.must(termQuery("path", path))
 				.must(termQuery("start", timestamp)))).build();
-		for (Class<? extends DomainEntity> domainEntityClass : domainTypes) {
+		for (Class<? extends DomainEntity<?>> domainEntityClass : domainTypes) {
 			elasticsearchOperations.delete(deleteQuery, domainEntityClass, elasticsearchOperations.getIndexCoordinatesFor(domainEntityClass));
 			elasticsearchOperations.indexOps(domainEntityClass).refresh();
 		}
@@ -572,7 +572,7 @@ public class BranchService {
 			branchPaths.add(promotionSourceBranch);
 		}
 		logger.info("Clearing end time for documents on {} ended at {}.", branchPaths, timestamp);
-		for (Class<? extends DomainEntity> type : domainTypes) {
+		for (Class<? extends DomainEntity<?>> type : domainTypes) {
 			// Find ended documents
 			Set<String> endedDocumentIds = new HashSet<>();
 			NativeQuery endedDocumentQuery = new NativeQueryBuilder()
@@ -581,7 +581,7 @@ public class BranchService {
 							.must(termsQuery("path", branchPaths))))
 					.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
 					.withPageable(LARGE_PAGE).build();
-			try (final SearchHitsIterator<? extends DomainEntity> endedDocs = elasticsearchOperations.searchForStream(endedDocumentQuery, type)) {
+			try (final SearchHitsIterator<? extends DomainEntity<?>> endedDocs = elasticsearchOperations.searchForStream(endedDocumentQuery, type)) {
 				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getContent().getInternalId()));
 			}
 

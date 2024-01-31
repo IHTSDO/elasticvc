@@ -212,6 +212,7 @@ public class BranchServiceTest extends AbstractTest {
 		metadata.put("something-else", "456");
 		metadata.put("some.nested.value", "this");
 		metadata.put("that", Maps.newHashMap("that", "true"));
+		metadata.put("list", Arrays.asList("one", "two", "three"));
 		branchService.create("MAIN", metadata);
 		Branch main = branchService.findLatest("MAIN");
 		assertEquals(metadata, main.getMetadata().getAsMap());
@@ -265,7 +266,7 @@ public class BranchServiceTest extends AbstractTest {
 		mergedMetadata.put("internal_additional", additionalValueMap);
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN", true).getMetadata().getAsMap());
 		// lock branch to add lock message metadata and make sure it is not inherited by child branch
-		branchService.lockBranch("MAIN", getBranchLockMetadata("Classifying"));
+		branchService.lockBranch("MAIN", constructBranchLockMetadata());
 		assertEquals(metadataA, branchService.findBranchOrThrow("MAIN/one", true).getMetadata().getAsMap());
 		assertEquals(mergedMetadata, branchService.findBranchOrThrow("MAIN/one/two", true).getMetadata().getAsMap());
 	}
@@ -288,12 +289,12 @@ public class BranchServiceTest extends AbstractTest {
 		}
 	}
 
-	private String getBranchLockMetadata(String description) {
+	private String constructBranchLockMetadata() {
 		Map<String, Object> lockMeta = new HashMap<>();
 		lockMeta.put("creationDate", lockMetadataDateFormat.format(new Date()));
 		Map<String, Object> lockContext = new HashMap<>();
 		lockContext.put("userId", "test");
-		lockContext.put("description", description);
+		lockContext.put("description", "Classifying");
 		lockMeta.put("context", lockContext);
 		try {
 			return "{object}|" + objectMapper.writeValueAsString(lockMeta);

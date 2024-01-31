@@ -74,7 +74,7 @@ public class ComponentService {
 	  Saves components within commit.
 	  @return The saved components with updated metadata not including those which were deleted.
 	 */
-	protected <C extends DomainEntity> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchRepository<C, String> repository) {
+	protected <C extends DomainEntity<?>> Iterable<C> doSaveBatchComponents(Collection<C> components, Commit commit, String idField, ElasticsearchRepository<C, String> repository) {
 		final Class<?>[] classes = TypeResolver.resolveRawArguments(ElasticsearchRepository.class, repository.getClass());
 		Class<C> componentClass = (Class<C>) classes[0];
 		commit.addDomainEntityClass(componentClass);

@@ -13,9 +13,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {TestConfiguration.class})
-abstract class AbstractTest {
+public abstract class AbstractTest {
 	@Autowired
-	ElasticsearchOperations elasticsearchOperations;
+	protected ElasticsearchOperations elasticsearchOperations;
 
 	private static final ElasticsearchContainer elasticsearchContainer = TestConfiguration.getElasticsearchContainerInstance();
 
