@@ -2,6 +2,7 @@ package io.kaicode.elasticvc;
 
 import io.kaicode.elasticvc.api.BranchService;
 import io.kaicode.elasticvc.api.ComponentService;
+import io.kaicode.elasticvc.api.VersionControlHelper;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.example.domain.Concept;
@@ -16,9 +17,7 @@ import org.springframework.data.elasticsearch.core.index.Settings;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.bool;
 import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
@@ -179,7 +178,7 @@ class ConceptExampleTest extends AbstractTest {
 		NativeQueryBuilder queryBuilder = new NativeQueryBuilder();
 		// After upgrading to 5.1.16 withFields is no longer working as expected
 		// Use withSourceFilter instead
-		queryBuilder.withSourceFilter(new FetchSourceFilter(new String[]{Concept.FIELD_ID}, null));
+		queryBuilder.withSourceFilter(new FetchSourceFilter(new String[] { Concept.FIELD_ID }, null));
 		queryBuilder.withQuery(bool(b -> b.must(termQuery(Concept.FIELD_ID, "1"))));
 
 		SearchHits<Concept> searchHits = elasticsearchOperations.search(queryBuilder.build(), Concept.class);
@@ -226,6 +225,30 @@ class ConceptExampleTest extends AbstractTest {
 					Concept.class
 			);
 		}
+	}
+
+
+	@Test
+	void testSavingConceptsWithSeparateIndex() {
+		// Create a concept in MAIN
+		branchService.create("MAIN");
+		conceptService.createUpdateConcept(new Concept("1", "Concept in MAIN"), "MAIN");
+		Concept concept = conceptService.findConcept("1", "MAIN");
+
+		// Create an extension branch with separate index for concepts in branch metadata
+		Map<String, Object> metadata = new HashMap<>();
+		metadata.put(VersionControlHelper.VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES, List.of("Concept"));
+		branchService.create("MAIN/EXTENSION-A", metadata);
+
+		// Update the concept in the extension branch and save
+		concept.setTerm("Updated by extension branch");
+		conceptService.createUpdateConcept(concept, "MAIN/EXTENSION-A");
+
+		// Check that the concept is saved in the extension branch index and no versions replaced are recorded
+		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A");
+		assertEquals("Updated by extension branch", concept.getTerm());
+		Map<String, Set<String>> versionsReplaced =  branchService.findLatest("MAIN/EXTENSION-A").getVersionsReplaced();
+		assertEquals(Collections.emptyMap(), versionsReplaced);
 	}
 
 	@AfterEach

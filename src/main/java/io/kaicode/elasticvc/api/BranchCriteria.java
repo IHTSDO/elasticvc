@@ -16,7 +16,7 @@ public class BranchCriteria {
 	private Query branchCriteria;
 	private Map<String, Set<String>> allEntityVersionsReplaced;
 	private List<String> excludeContentFromPath;
-
+	private Map<String, List<String>> excludeContentFromPathsByEntity;
 	BranchCriteria(String branchPath, Date timepoint) {
 		this.branchPath = branchPath;
 		this.timepoint = timepoint;
@@ -41,6 +41,9 @@ public class BranchCriteria {
 		if (excludeContentFromPath != null && !excludeContentFromPath.isEmpty()) {
 			builder.mustNot(termsQuery("path", excludeContentFromPath));
 		}
+		if (excludeContentFromPathsByEntity != null && excludeContentFromPathsByEntity.containsKey(entityClass.getSimpleName())) {
+			builder.mustNot(termsQuery("path", excludeContentFromPathsByEntity.get(entityClass.getSimpleName())));
+		}
 		return builder.build()._toQuery();
 	}
 
@@ -50,7 +53,6 @@ public class BranchCriteria {
 		}
 		excludeContentFromPath.add(path);
 	}
-
 	public String getBranchPath() {
 		return branchPath;
 	}
@@ -58,6 +60,15 @@ public class BranchCriteria {
 	public Date getTimepoint() {
 		return timepoint;
 	}
+
+
+	void excludeEntityContentFromPaths(String entityClassName, List<String> pathsToExclude) {
+		if (this.excludeContentFromPathsByEntity == null) {
+			this.excludeContentFromPathsByEntity = new HashMap<>();
+		}
+		this.excludeContentFromPathsByEntity.put(entityClassName, pathsToExclude);
+	}
+
 
 	@Override
 	public String toString() {
