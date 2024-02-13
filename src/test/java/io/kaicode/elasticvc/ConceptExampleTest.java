@@ -235,19 +235,32 @@ class ConceptExampleTest extends AbstractTest {
 		conceptService.createUpdateConcept(new Concept("1", "Concept in MAIN"), "MAIN");
 		Concept concept = conceptService.findConcept("1", "MAIN");
 
-		// Create an extension branch with separate index for concepts in branch metadata
-		Map<String, Object> metadata = new HashMap<>();
-		metadata.put(VersionControlHelper.VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES, List.of("Concept"));
-		branchService.create("MAIN/EXTENSION-A", metadata);
-
+		branchService.create("MAIN/EXTENSION-A");
 		// Update the concept in the extension branch and save
 		concept.setTerm("Updated by extension branch");
 		conceptService.createUpdateConcept(concept, "MAIN/EXTENSION-A");
 
-		// Check that the concept is saved in the extension branch index and no versions replaced are recorded
+		// Check that the concept is saved in the extension branch index and versions replaced are recorded
 		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A");
 		assertEquals("Updated by extension branch", concept.getTerm());
 		Map<String, Set<String>> versionsReplaced =  branchService.findLatest("MAIN/EXTENSION-A").getVersionsReplaced();
+		assertNotNull(versionsReplaced.get("Concept"));
+		assertEquals(1, versionsReplaced.get("Concept").size());
+
+		// Update metadata to store concept separately
+		Map<String, Object> metadata = new HashMap<>();
+		metadata.put(VersionControlHelper.VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES, List.of("Concept"));
+		branchService.updateMetadata("MAIN/EXTENSION-A", metadata);
+
+
+		// Update the concept in the extension branch and save
+		concept.setTerm("Updated by extension branch to use separate index");
+		conceptService.createUpdateConcept(concept, "MAIN/EXTENSION-A");
+
+		// Check that the concept is saved in the extension branch index and versions replaced are NOT recorded
+		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A");
+		assertEquals("Updated by extension branch to use separate index", concept.getTerm());
+		versionsReplaced =  branchService.findLatest("MAIN/EXTENSION-A").getVersionsReplaced();
 		assertEquals(Collections.emptyMap(), versionsReplaced);
 	}
 

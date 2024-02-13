@@ -49,6 +49,9 @@ public class BranchService {
 	@Autowired
 	private ElasticsearchOperations elasticsearchOperations;
 
+	@Autowired
+	private VersionControlHelper versionControlHelper;
+
 	private final BranchMetadataHelper branchMetadataHelper;
 
 	private final List<CommitListener> commitListeners;
@@ -438,7 +441,12 @@ public class BranchService {
 		newBranchTimespan.setStart(timepoint);
 		newBranchTimespan.setHead(timepoint);
 		newBranchTimespan.setMetadata(oldBranchTimespan.getMetadata());
-		newBranchTimespan.addVersionsReplaced(oldBranchTimespan.getVersionsReplaced());
+
+		// Clear previous versions replaced for entity classes that have separate documents (i.e not inherit from MAIN)
+		Map<String, Set<String>> oldVersionsReplaced = oldBranchTimespan.getVersionsReplaced();
+		versionControlHelper.getEntityClassNamesWithSeparateIndex(newBranchTimespan).forEach(oldVersionsReplaced::remove);
+		newBranchTimespan.addVersionsReplaced(oldVersionsReplaced);
+
 		newBranchTimespan.addVersionsReplaced(commit.getEntityVersionsReplaced());
 		newBranchTimespan.setCreation(oldBranchTimespan.getCreation());
 		newBranchTimespan.setLastPromotion(oldBranchTimespan.getLastPromotion());
