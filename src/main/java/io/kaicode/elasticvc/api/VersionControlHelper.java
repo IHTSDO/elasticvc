@@ -33,7 +33,8 @@ import static io.kaicode.elasticvc.helper.QueryHelper.*;
 public class VersionControlHelper {
 
 	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
-	public static final String VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES = "vc.separate-index.entity-class-names";
+
+	public static final String PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES = "vc.parent-branches-excluded.entity-class-names";
 
 	@Autowired
 	private BranchService branchService;
@@ -259,7 +260,7 @@ public class VersionControlHelper {
 		branchQueryBuilder.should(thisBranchShouldClause.build()._toQuery());
 		Query must = branchQueryBuilder.build()._toQuery();
 		BranchCriteria branchCriteria =  new BranchCriteria(branch.getPath(), must, allEntityVersionsReplaced, timepoint);
-		getEntityClassNamesWithSeparateIndex(branch).forEach(entityClassName -> branchCriteria.excludeEntityContentFromPaths(entityClassName, getParentPaths(branch.getPath())));
+		getParentBranchesExcludedEntityClassNames(branch).forEach(entityClassName -> branchCriteria.excludeEntityContentFromPaths(entityClassName, getParentPaths(branch.getPath())));
 		return branchCriteria;
 	}
 
@@ -312,7 +313,7 @@ public class VersionControlHelper {
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
 
 		// Skip versions hiding if entity is stored in a separate index
-		if (getEntityClassNamesWithSeparateIndex(commit.getBranch()).contains(entityClass.getSimpleName())) {
+		if (getParentBranchesExcludedEntityClassNames(commit.getBranch()).contains(entityClass.getSimpleName())) {
 			 logger.debug("Skipping versions hiding for {} on branch {}", entityClass.getSimpleName(), commit.getBranch().getPath());
 		} else {
 			// Hide versions of the entity on other paths from this branch
@@ -336,10 +337,10 @@ public class VersionControlHelper {
 		}
 	}
 
-	public Collection<String> getEntityClassNamesWithSeparateIndex(Branch branch) {
+	public Collection<String> getParentBranchesExcludedEntityClassNames(Branch branch) {
 		Map<String, Object> metaData = branch.getMetadata().getAsMap();
-		if (metaData.containsKey(VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES)) {
-			Object value = metaData.get(VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES);
+		if (metaData.containsKey(PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES)) {
+			Object value = metaData.get(PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES);
 			if (value instanceof String) {
 				return List.of((String) value);
 			} else if (value instanceof Collection) {

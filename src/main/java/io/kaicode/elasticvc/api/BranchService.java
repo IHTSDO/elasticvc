@@ -444,7 +444,7 @@ public class BranchService {
 
 		// Clear previous versions replaced for entity classes that have separate documents (i.e not inherit from MAIN)
 		Map<String, Set<String>> oldVersionsReplaced = oldBranchTimespan.getVersionsReplaced();
-		versionControlHelper.getEntityClassNamesWithSeparateIndex(newBranchTimespan).forEach(oldVersionsReplaced::remove);
+		versionControlHelper.getParentBranchesExcludedEntityClassNames(newBranchTimespan).forEach(oldVersionsReplaced::remove);
 		newBranchTimespan.addVersionsReplaced(oldVersionsReplaced);
 
 		newBranchTimespan.addVersionsReplaced(commit.getEntityVersionsReplaced());

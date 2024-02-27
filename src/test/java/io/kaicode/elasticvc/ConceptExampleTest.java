@@ -229,7 +229,7 @@ class ConceptExampleTest extends AbstractTest {
 
 
 	@Test
-	void testSavingConceptsWithSeparateIndex() {
+	void testSavingConcepts() {
 		// Create a concept in MAIN
 		branchService.create("MAIN");
 		conceptService.createUpdateConcept(new Concept("1", "Concept in MAIN"), "MAIN");
@@ -247,19 +247,19 @@ class ConceptExampleTest extends AbstractTest {
 		assertNotNull(versionsReplaced.get("Concept"));
 		assertEquals(1, versionsReplaced.get("Concept").size());
 
-		// Update metadata to store concept separately
+		// Update metadata to exclude Concept from parent branch
 		Map<String, Object> metadata = new HashMap<>();
-		metadata.put(VersionControlHelper.VC_SEPARATE_INDEX_ENTITY_CLASS_NAMES, List.of("Concept"));
+		metadata.put(VersionControlHelper.PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES, List.of("Concept"));
 		branchService.updateMetadata("MAIN/EXTENSION-A", metadata);
 
 
 		// Update the concept in the extension branch and save
-		concept.setTerm("Updated by extension branch to use separate index");
+		concept.setTerm("Updated by extension branch again");
 		conceptService.createUpdateConcept(concept, "MAIN/EXTENSION-A");
 
-		// Check that the concept is saved in the extension branch index and versions replaced are NOT recorded
+		// Check that the concept is saved in the extension branch and versions replaced are NOT recorded
 		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A");
-		assertEquals("Updated by extension branch to use separate index", concept.getTerm());
+		assertEquals("Updated by extension branch again", concept.getTerm());
 		versionsReplaced =  branchService.findLatest("MAIN/EXTENSION-A").getVersionsReplaced();
 		assertEquals(Collections.emptyMap(), versionsReplaced);
 	}
