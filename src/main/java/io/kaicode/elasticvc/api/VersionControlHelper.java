@@ -260,7 +260,7 @@ public class VersionControlHelper {
 		branchQueryBuilder.should(thisBranchShouldClause.build()._toQuery());
 		Query must = branchQueryBuilder.build()._toQuery();
 		BranchCriteria branchCriteria =  new BranchCriteria(branch.getPath(), must, allEntityVersionsReplaced, timepoint);
-		getParentBranchesExcludedEntityClassNames(branch).forEach(entityClassName -> branchCriteria.excludeEntityContentFromPaths(entityClassName, getParentPaths(branch.getPath())));
+		getParentBranchesToExcludeByEntityClassName(branch.getPath()).forEach(branchCriteria::excludeEntityContentFromPaths);
 		return branchCriteria;
 	}
 
@@ -312,35 +312,29 @@ public class VersionControlHelper {
 		// End versions of the entity on this path by setting end date
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);
 
-		// Skip versions hiding if entity is stored in a separate index
-		if (getParentBranchesExcludedEntityClassNames(commit.getBranch()).contains(entityClass.getSimpleName())) {
-			 logger.debug("Skipping versions hiding for {} on branch {}", entityClass.getSimpleName(), commit.getBranch().getPath());
-		} else {
-			// Hide versions of the entity on other paths from this branch
-			final NativeQuery query = new NativeQueryBuilder()
-					.withQuery(bool(b -> b
-							.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
-							.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
-							.mustNot(termQuery("path", commit.getBranch().getPath()))))
-					.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
-					.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
-					.withPageable(LARGE_PAGE)
-					.build();
+		// Hide versions of the entity on other paths from this branch
+		final NativeQuery query = new NativeQueryBuilder()
+				.withQuery(bool(b -> b
+						.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
+						.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
+						.mustNot(termQuery("path", commit.getBranch().getPath()))))
+				.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
+				.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
+				.withPageable(LARGE_PAGE)
+				.build();
 
-			Set<String> versionsReplaced = new HashSet<>();
-			try (final SearchHitsIterator<T> replacedVersions = elasticsearchOperations.searchForStream(query, entityClass)) {
-				replacedVersions.forEachRemaining(version -> versionsReplaced.add(version.getContent().getInternalId()));
-			}
-			commit.addVersionsReplaced(versionsReplaced, entityClass);
-
-			logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
+		Set<String> versionsReplaced = new HashSet<>();
+		try (final SearchHitsIterator<T> replacedVersions = elasticsearchOperations.searchForStream(query, entityClass)) {
+			replacedVersions.forEachRemaining(version -> versionsReplaced.add(version.getContent().getInternalId()));
 		}
+		commit.addVersionsReplaced(versionsReplaced, entityClass);
+
+		logger.debug("Replaced {} {} {}", versionsReplaced.size(), entityClass.getSimpleName(), versionsReplaced);
 	}
 
-	public Collection<String> getParentBranchesExcludedEntityClassNames(Branch branch) {
-		Map<String, Object> metaData = branch.getMetadata().getAsMap();
-		if (metaData.containsKey(PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES)) {
-			Object value = metaData.get(PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES);
+	 public List<String> getParentBranchesExcludedEntityClassNames(Branch branch) {
+		Object value = branch.getMetadata().getAsMap().get(PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES);
+		if (value != null) {
 			if (value instanceof String) {
 				return List.of((String) value);
 			} else if (value instanceof Collection) {
@@ -349,6 +343,27 @@ public class VersionControlHelper {
 		}
 		return Collections.emptyList();
 	}
+
+	 Map<String, List<String>> getParentBranchesToExcludeByEntityClassName(String branchPath) {
+		// Check if the inherited branch metadata contains the config to exclude parent branches
+		Branch branch = branchService.findBranchOrThrow(branchPath, true);
+		List<String> entityClassNames = getParentBranchesExcludedEntityClassNames(branch);
+		if (entityClassNames.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<String, List<String>> result = new HashMap<>();
+		String currentPath = branchPath;
+		do {
+			branch = branchService.findBranchOrThrow(currentPath);
+			entityClassNames = getParentBranchesExcludedEntityClassNames(branch);
+			for (String entityClassName : entityClassNames) {
+				result.put(entityClassName, getParentPaths(currentPath));
+			}
+			currentPath = PathUtil.getParentPath(currentPath);
+		} while(currentPath != null && entityClassNames.isEmpty() && !PathUtil.isRoot(currentPath));
+		return result;
+	}
+
 
 	@SuppressWarnings("unused")
 	public <T extends DomainEntity<?>> void endAllVersionsOnThisBranch(Class<T> entityClass, @Nullable Query selectionClause, Commit commit, ElasticsearchRepository<T, String> repository) {

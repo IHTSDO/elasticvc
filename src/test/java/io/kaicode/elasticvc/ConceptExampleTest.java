@@ -257,11 +257,31 @@ class ConceptExampleTest extends AbstractTest {
 		concept.setTerm("Updated by extension branch again");
 		conceptService.createUpdateConcept(concept, "MAIN/EXTENSION-A");
 
-		// Check that the concept is saved in the extension branch and versions replaced are NOT recorded
+		// Check that the concept is saved in the extension branch and no versions replaced is recorded
 		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A");
 		assertEquals("Updated by extension branch again", concept.getTerm());
 		versionsReplaced =  branchService.findLatest("MAIN/EXTENSION-A").getVersionsReplaced();
-		assertEquals(Collections.emptyMap(), versionsReplaced);
+		assertEquals(0, versionsReplaced.get("Concept").size());
+
+		// Check project version
+		branchService.create("MAIN/EXTENSION-A/PROJECT-A");
+		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A/PROJECT-A");
+		assertEquals("Updated by extension branch again", concept.getTerm());
+
+		// Check task version
+		branchService.create("MAIN/EXTENSION-A/PROJECT-A/TASK-A");
+		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A/PROJECT-A");
+		assertEquals("Updated by extension branch again", concept.getTerm());
+
+		// Update config at project level to exclude Concept from parent branch which means it should not be visible in the project branch
+		metadata.put(VersionControlHelper.PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES, List.of("Concept"));
+		branchService.updateMetadata("MAIN/EXTENSION-A/PROJECT-A", metadata);
+		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A/PROJECT-A");
+		assertNull(concept);
+
+		// Not visible from task branch either
+		concept = conceptService.findConcept("1", "MAIN/EXTENSION-A/PROJECT-A/TASK-A");
+		assertNull(concept);
 	}
 
 	@AfterEach
