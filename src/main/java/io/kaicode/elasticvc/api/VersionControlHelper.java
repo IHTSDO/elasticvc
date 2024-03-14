@@ -36,6 +36,8 @@ public class VersionControlHelper {
 
 	public static final String PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES = "vc.parent-branches-excluded.entity-class-names";
 
+	public static final String ADDITIONAL_DEPENDENT_BRANCHES = "vc.additional-dependent-branches";
+
 	@Autowired
 	private BranchService branchService;
 
@@ -165,7 +167,25 @@ public class VersionControlHelper {
 		return branch;
 	}
 
+
 	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit) {
+		// Check if the inherited branch metadata having additional dependencies
+		Branch latest = branchService.findBranchOrThrow(branch.getPath(), true);
+		List<String> additionalDependencies = getMetaDataValues(latest, ADDITIONAL_DEPENDENT_BRANCHES);
+		if (!additionalDependencies.isEmpty()) {
+			MultiBranchCriteria multiBranchCriteria = new MultiBranchCriteria(latest.getPath(), latest.getHead());
+			multiBranchCriteria.add(getBranchCriteria(latest, latest.getHead(), versionsReplaced, contentSelection, commit, false));
+			for (String dependentPath : additionalDependencies) {
+				Branch dependentBranch = branchService.findBranchOrThrow(dependentPath);
+				BranchCriteria dependent = getBranchCriteria(dependentBranch, dependentBranch.getHead(), versionsReplaced, contentSelection, commit, true);
+				multiBranchCriteria.add(dependent);
+			}
+			return multiBranchCriteria;
+		}
+		return getBranchCriteria(branch, timepoint, versionsReplaced, contentSelection, commit, false);
+	}
+
+	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit, boolean skipRoot) {
 		// When adding top level clauses to the branchCriteria BoolQuery.Builder we must either use all 'should' clauses or all 'must' clauses.
 		// If any 'must' clauses are given then the 'should' clauses do not have to match in Elasticsearch.
 		// We will use a 'should' clause to select content from each branch that can match (usually this branch and ancestors).
@@ -182,7 +202,8 @@ public class VersionControlHelper {
 						.should(range(rq -> rq.field("end").gt(of(timepoint.getTime()))))
 				));
 				// Or any parent branch within time constraints
-				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced);
+
+				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced, skipRoot);
 			}
 			case STANDARD_SELECTION_BEFORE_THIS_COMMIT -> {
 				// On this branch and started not ended
@@ -193,7 +214,7 @@ public class VersionControlHelper {
 								.should(termQuery("end", commit.getTimepoint().getTime())))
 				);
 				// Or any parent branch within time constraints
-				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced);
+				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced, skipRoot);
 			}
 			case CHANGES_ON_THIS_BRANCH_ONLY ->
 				// On this branch and started not ended
@@ -274,9 +295,12 @@ public class VersionControlHelper {
 		return parents;
 	}
 
-	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQuery.Builder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced) {
+	private Map<String, Set<String>> addParentCriteriaRecursively(BoolQuery.Builder branchCriteria, Branch branch, Map<String, Set<String>> versionsReplaced, boolean skipRoot) {
 		String parentPath = PathUtil.getParentPath(branch.getPath());
 		if (parentPath != null) {
+			if (skipRoot && PathUtil.isRoot(parentPath)) {
+				return versionsReplaced;
+			}
 			final Branch parentBranch = branchService.findAtTimepointOrThrow(parentPath, branch.getBase());
 			versionsReplaced = MapUtil.addAll(versionsReplaced, new HashMap<>());
 			MapUtil.addAll(parentBranch.getVersionsReplaced(), versionsReplaced);
@@ -288,7 +312,7 @@ public class VersionControlHelper {
 							.should(bool(sb -> sb.mustNot(existsQuery("end"))))
 							.should(range(rq -> rq.field("end").gt(of(base.getTime()))))))
 			));
-			return addParentCriteriaRecursively(branchCriteria, parentBranch, versionsReplaced);
+			return addParentCriteriaRecursively(branchCriteria, parentBranch, versionsReplaced, skipRoot);
 		}
 		return versionsReplaced;
 	}
@@ -333,7 +357,11 @@ public class VersionControlHelper {
 	}
 
 	 public List<String> getParentBranchesExcludedEntityClassNames(Branch branch) {
-		Object value = branch.getMetadata().getAsMap().get(PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES);
+		return getMetaDataValues(branch, PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES);
+	}
+
+	private List<String> getMetaDataValues(Branch branch, String metaDataKey) {
+		Object value = branch.getMetadata().getAsMap().get(metaDataKey);
 		if (value != null) {
 			if (value instanceof String) {
 				return List.of((String) value);
@@ -344,7 +372,7 @@ public class VersionControlHelper {
 		return Collections.emptyList();
 	}
 
-	 Map<String, List<String>> getParentBranchesToExcludeByEntityClassName(String branchPath) {
+	Map<String, List<String>> getParentBranchesToExcludeByEntityClassName(String branchPath) {
 		// Check if the inherited branch metadata contains the config to exclude parent branches
 		Branch branch = branchService.findBranchOrThrow(branchPath, true);
 		List<String> entityClassNames = getParentBranchesExcludedEntityClassNames(branch);
