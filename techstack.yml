@@ -1,0 +1,172 @@
+repo_name: IHTSDO/elasticvc
+report_id: 7a2011911ead0e22b2a1b77c459d689a
+version: 0.1
+repo_type: Public
+timestamp: '2024-03-21T12:56:40+00:00'
+requested_by: CoderMChu
+provider: github
+branch: master
+detected_tools_count: 13
+tools:
+- name: Java
+  description: A concurrent, class-based, object-oriented, language specifically designed
+    to have as few implementation dependencies as possible
+  website_url: https://www.java.com
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/995/K85ZWV2F.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc
+  detection_source: Repo Metadata
+- name: Spring Framework
+  description: An application framework and inversion of control container for the
+    Java platform
+  website_url: https://spring.io/projects/spring-framework
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Frameworks (Full Stack)
+  image_url: https://img.stackshare.io/service/2006/spring-framework-project-logo.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: guava
+  description: Google Core Libraries for Java 6+
+  website_url: https://github.com/google/guava
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Java Tools
+  image_url: https://img.stackshare.io/service/2970/wBjKn0ol.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: Spring Data
+  description: Provides a consistent approach to data access – relational, non-relational,
+    map-reduce, and beyond
+  website_url: https://spring.io/projects/spring-data
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Database Tools
+  image_url: https://img.stackshare.io/service/7624/IG6D4Ro2_400x400.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: Git
+  description: Fast, scalable, distributed revision control system
+  website_url: http://git-scm.com/
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Version Control System
+  image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc
+  detection_source: Repo Metadata
+- name: JUnit
+  description: A programmer-oriented testing framework for Java
+  website_url: http://junit.org/
+  license: EPL-1.0
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Testing Frameworks
+  image_url: https://img.stackshare.io/service/2020/874086.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Kai Kewley
+  last_updated_on: 2016-12-21 23:46:58.000000000 Z
+- name: Elasticsearch
+  description: Open Source, Distributed, RESTful Search Engine
+  website_url: https://www.elastic.co/products/elasticsearch
+  open_source: true
+  hosted_saas: false
+  category: Application Utilities
+  sub_category: Search as a Service
+  image_url: https://img.stackshare.io/service/841/Image_2019-05-20_at_4.58.04_PM.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: com.google.guava:guava
+  description: Guava is a suite of core and expanded libraries that include utility
+    classes
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: Maven Packages
+  image_url: https://img.stackshare.io/package/maven/image.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: net.jodah:typetools
+  description: Tools for working with generic types
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: Maven Packages
+  image_url: https://img.stackshare.io/package/maven/image.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: org.junit.jupiter:junit-jupiter-api
+  description: Module "junit-jupiter-api" of JUnit 5
+  license: EPL-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: Maven Packages
+  image_url: https://img.stackshare.io/package/maven/image.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: org.junit.jupiter:junit-jupiter-engine
+  description: Module "junit-jupiter-engine" of JUnit 5
+  license: EPL-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: Maven Packages
+  image_url: https://img.stackshare.io/package/maven/image.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: org.springframework.boot:spring-boot-starter-test
+  description: Starter for testing Spring Boot applications with libraries including
+    JUnit
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: Maven Packages
+  image_url: https://img.stackshare.io/package/maven/image.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
+- name: org.springframework.boot:spring-boot-starter-web
+  description: Starter for building web, including RESTful, applications using Spring
+    MVC
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: Maven Packages
+  image_url: https://img.stackshare.io/package/maven/image.png
+  detection_source_url: https://github.com/IHTSDO/elasticvc/blob/master/pom.xml
+  detection_source: pom.xml
+  last_updated_by: Jim Cornmell
+  last_updated_on: 2023-08-15 13:30:36.000000000 Z
