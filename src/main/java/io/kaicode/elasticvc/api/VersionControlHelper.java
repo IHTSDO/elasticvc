@@ -7,6 +7,7 @@ import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.domain.Entity;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import org.springframework.util.Assert;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
@@ -30,7 +32,7 @@ import static io.kaicode.elasticvc.api.VersionControlHelper.ContentSelection.CHA
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
 
 @Service
-public class VersionControlHelper {
+public class VersionControlHelper implements CommitListener {
 
 	public static final PageRequest LARGE_PAGE = PageRequest.of(0, 10_000);
 
@@ -44,12 +46,27 @@ public class VersionControlHelper {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
+	private final Map<String, Branch> branchCache = new ConcurrentHashMap<>();
+	private final Map<String, BranchCriteria> branchCriteriaCache = new ConcurrentHashMap<>();
+
+	@PostConstruct
+	public void init() {
+		branchService.addCommitListener(this);
+	}
+
+	@Override
+	public void preCommitCompletion(Commit commit) throws IllegalStateException {
+		branchCache.remove(commit.getBranch().getPath());
+	}
+
 	public BranchCriteria getBranchCriteria(String path) {
 		return getBranchCriteria(getBranchOrThrow(path));
 	}
 
 	public BranchCriteria getBranchCriteria(Branch branch) {
-		return getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
+		String key = branch.getPath() + branch.getHeadTimestamp();
+		return branchCriteriaCache.computeIfAbsent(key, i ->
+				getBranchCriteria(branch, branch.getHead(), branch.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null));
 	}
 
 	@SuppressWarnings("unused")
@@ -158,11 +175,14 @@ public class VersionControlHelper {
 
 	@SuppressWarnings("unused")
 	private Branch getBranchOrThrow(String path) {
-		final Branch branch = branchService.findLatest(path);
-		if (branch == null) {
-			throw new IllegalArgumentException("Branch '" + path + "' does not exist.");
+		if (!branchCache.containsKey(path)) {
+			final Branch branch = branchService.findLatest(path);
+			if (branch == null) {
+				throw new IllegalArgumentException("Branch '" + path + "' does not exist.");
+			}
+			branchCache.put(path, branch);
 		}
-		return branch;
+		return branchCache.get(path);
 	}
 
 	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit) {
