@@ -9,7 +9,7 @@ public class SortBuilders {
     }
 
     public static SortOptions fieldSortDesc(String fieldName) {
-        return SortOptions.of(s -> s.field(f -> f.field(fieldName)));
+        return SortOptions.of(s -> s.field(f -> f.field(fieldName).order(SortOrder.Desc)));
     }
 
     public static SortOptions fieldSortAsc(String fieldName) {
