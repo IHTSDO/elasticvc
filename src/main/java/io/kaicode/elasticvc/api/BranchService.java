@@ -517,7 +517,6 @@ public class BranchService {
 		if (commit.isRebase()) {
 			resetBranchBase(commit);
 		}
-		clearLock(branch);
 
 		if (commit.getCommitType() == Commit.CommitType.PROMOTION) {
 			unlock(commit.getSourceBranchPath());
@@ -528,7 +527,7 @@ public class BranchService {
 		if (latest != null) {
 			branch.setMetadata(latest.getMetadata());
 		}
-
+		clearLock(branch);
 		save(branch);
 	}
 
