@@ -5,14 +5,14 @@
 
     <groupId>io.kaicode</groupId>
     <artifactId>elasticvc</artifactId>
-    <version>6.3.0-SNAPSHOT</version>
+    <version>6.3.0</version>
     <name>ElasticVC</name>
     <description>A Version Control System using Elasticsearch</description>
 
     <parent>
         <groupId>org.snomed</groupId>
         <artifactId>snomed-parent-bom</artifactId>
-        <version>3.10.0-SNAPSHOT</version>
+        <version>3.10.0</version>
     </parent>
 
     <dependencies>
