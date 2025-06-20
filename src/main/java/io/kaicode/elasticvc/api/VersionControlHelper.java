@@ -171,8 +171,11 @@ public class VersionControlHelper {
 	private BranchCriteria getBranchCriteria(Branch branch, Date timepoint, Map<String, Set<String>> versionsReplaced, ContentSelection contentSelection, Commit commit) {
 		// Check if the inherited branch metadata having additional dependencies
 		Branch latest = branchService.findBranchOrThrow(branch.getPath(), true);
-		List<String> additionalDependencies = getMetaDataValues(latest, ADDITIONAL_DEPENDENT_BRANCHES);
-		if (!additionalDependencies.isEmpty()) {
+		List<String> additionalDependencies = null;
+		if (ContentSelection.STANDARD_SELECTION.equals(contentSelection) || ContentSelection.STANDARD_SELECTION_BEFORE_THIS_COMMIT.equals(contentSelection)) {
+			additionalDependencies = getMetaDataValues(latest, ADDITIONAL_DEPENDENT_BRANCHES);
+		}
+		if (additionalDependencies != null && !additionalDependencies.isEmpty()) {
 			MultiBranchCriteria multiBranchCriteria = new MultiBranchCriteria(latest.getPath(), latest.getHead());
 			multiBranchCriteria.add(getBranchCriteria(latest, latest.getHead(), versionsReplaced, contentSelection, commit, false));
 			for (String dependentPath : additionalDependencies) {
@@ -358,6 +361,10 @@ public class VersionControlHelper {
 
 	 public List<String> getParentBranchesExcludedEntityClassNames(Branch branch) {
 		return getMetaDataValues(branch, PARENT_BRANCHES_EXCLUDED_ENTITY_CLASS_NAMES);
+	}
+
+	public List<String> getAdditionalDependencies(Branch branch) {
+		return getMetaDataValues(branch, ADDITIONAL_DEPENDENT_BRANCHES);
 	}
 
 	private List<String> getMetaDataValues(Branch branch, String metaDataKey) {
