@@ -176,8 +176,8 @@ public class VersionControlHelper {
 			additionalDependencies = getMetaDataValues(latest, ADDITIONAL_DEPENDENT_BRANCHES);
 		}
 		if (additionalDependencies != null && !additionalDependencies.isEmpty()) {
-			MultiBranchCriteria multiBranchCriteria = new MultiBranchCriteria(latest.getPath(), latest.getHead());
-			multiBranchCriteria.add(getBranchCriteria(latest, latest.getHead(), versionsReplaced, contentSelection, commit, false));
+			MultiBranchCriteria multiBranchCriteria = new MultiBranchCriteria(branch.getPath(), timepoint);
+			multiBranchCriteria.add(getBranchCriteria(branch, timepoint, versionsReplaced, contentSelection, commit, false));
 			for (String dependentPath : additionalDependencies) {
 				Branch dependentBranch = branchService.findBranchOrThrow(dependentPath);
 				BranchCriteria dependent = getBranchCriteria(dependentBranch, dependentBranch.getHead(), versionsReplaced, contentSelection, commit, true);
