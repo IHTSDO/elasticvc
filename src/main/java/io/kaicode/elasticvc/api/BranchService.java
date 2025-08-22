@@ -2,7 +2,8 @@ package io.kaicode.elasticvc.api;
 
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.SortOrder;
-import co.elastic.clients.elasticsearch._types.query_dsl.*;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
@@ -11,7 +12,6 @@ import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.domain.DomainEntity;
 import io.kaicode.elasticvc.domain.Metadata;
 import io.kaicode.elasticvc.repositories.BranchRepository;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
-import org.springframework.data.elasticsearch.core.*;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.SearchHitsIterator;
 import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
@@ -32,7 +35,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
-import static co.elastic.clients.json.JsonData.*;
+import static co.elastic.clients.json.JsonData.of;
 import static io.kaicode.elasticvc.api.VersionControlHelper.LARGE_PAGE;
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
 import static java.util.stream.Collectors.toList;
@@ -56,12 +59,15 @@ public class BranchService {
 
 	private final List<CommitListener> commitListeners;
 
+	private final List<BranchSaveListener> branchSaveListeners;
+
 	private final Object branchLockSyncObject = new Object();
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	public BranchService(@Autowired ObjectMapper objectMapper) {
 		commitListeners = new ArrayList<>();
+		branchSaveListeners = new ArrayList<>();
 		branchMetadataHelper = new BranchMetadataHelper(objectMapper);
 	}
 
@@ -498,12 +504,21 @@ public class BranchService {
 
 	private Branch save(Branch branch) {
 		updateInternalMetadata(branch);
-		return branchRepository.save(branch);
+		Branch persistedBranch = branchRepository.save(branch);
+		executePostSaveListeners(List.of(persistedBranch));
+		return persistedBranch;
 	}
 
 	private void saveAll(Iterable<Branch> branches) {
 		branches.forEach(this::updateInternalMetadata);
 		branchRepository.saveAll(branches);
+		executePostSaveListeners(branches);
+	}
+
+	private void executePostSaveListeners(Iterable<Branch> branches) {
+		for (BranchSaveListener listener : branchSaveListeners) {
+			branches.forEach(listener::postSaveCompletion);
+		}
 	}
 
 	private void rollbackCommit(Commit commit) {
@@ -648,6 +663,13 @@ public class BranchService {
 		}
 	}
 
+	@SuppressWarnings("unused")
+	public void addBranchSaveListener(BranchSaveListener listener) {
+		if (!branchSaveListeners.contains(listener)) {
+			branchSaveListeners.add(listener);
+		}
+	}
+
 	private Branch illegalState(String message) {
 		logger.error(message);
 		throw new IllegalStateException(message);
@@ -665,5 +687,13 @@ public class BranchService {
 	@SuppressWarnings("unused")
 	public List<CommitListener> getCommitListeners() {
 		return Collections.unmodifiableList(commitListeners);
+	}
+
+	/**
+	 * Get unmodifiable list of save listeners. To add a listener use the addBranchSaveListener method.
+	 * @return unmodifiable list of save listeners.
+	 */
+	public List<BranchSaveListener> getBranchSaveListeners() {
+		return Collections.unmodifiableList(branchSaveListeners);
 	}
 }
