@@ -30,9 +30,13 @@ public class BranchCriteria {
 
 
 	public Query getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass) {
+		return getEntityBranchCriteria(entityClass, true);
+	}
+
+	protected Query getEntityBranchCriteria(Class<? extends DomainEntity<?>> entityClass, boolean applyVersionsReplaced) {
 		BoolQuery.Builder builder = bool().must(branchCriteria);
 
-		if (allEntityVersionsReplaced != null && !allEntityVersionsReplaced.isEmpty()) {
+		if (applyVersionsReplaced && allEntityVersionsReplaced != null && !allEntityVersionsReplaced.isEmpty()) {
 			Set<String> values = allEntityVersionsReplaced.get(entityClass.getSimpleName());
 			if (values != null && !values.isEmpty()) {
 				builder.mustNot(termsQuery("_id", values));
@@ -61,6 +65,9 @@ public class BranchCriteria {
 		return timepoint;
 	}
 
+	public Map<String, Set<String>> getAllEntityVersionsReplaced() {
+		return allEntityVersionsReplaced;
+	}
 
 	void excludeEntityContentFromPaths(String entityClassName, List<String> pathsToExclude) {
 		if (this.excludeContentFromPathsByEntity == null) {

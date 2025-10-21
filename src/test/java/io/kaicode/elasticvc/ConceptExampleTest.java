@@ -284,6 +284,119 @@ class ConceptExampleTest extends AbstractTest {
 		assertNull(concept);
 	}
 
+	@Test
+	void testMultiBranchCriteria() {
+		// Test that version replaced works correctly in MultiBranchCriteria
+		// Scenario: MAIN/B depends on MAIN/A via ADDITIONAL_DEPENDENT_BRANCHES
+		
+		// Create MAIN with a concept
+		branchService.create("MAIN");
+		conceptService.createUpdateConcept(new Concept("1", "Concept on MAIN"), "MAIN");
+		
+		// Create MAIN/A and update the concept (creates version replacement)
+		branchService.create("MAIN/A");
+		Concept concept = conceptService.findConcept("1", "MAIN/A");
+		assertNotNull(concept, "MAIN/A should see MAIN's content on creation");
+		assertEquals("Concept on MAIN", concept.getTerm(), "MAIN/A initially sees MAIN version");
+		
+		concept.setTerm("Updated in MAIN/A");
+		conceptService.createUpdateConcept(concept, "MAIN/A");
+		
+		// Verify MAIN/A now has its own version with version replacement recorded
+		assertEquals("Updated in MAIN/A", conceptService.findConcept("1", "MAIN/A").getTerm());
+		Map<String, Set<String>> versionsReplacedA = branchService.findLatest("MAIN/A").getVersionsReplaced();
+		assertNotNull(versionsReplacedA.get("Concept"), "MAIN/A should have version replacements");
+		assertEquals(1, versionsReplacedA.get("Concept").size(), "MAIN/A replaced 1 version from MAIN");
+
+		conceptService.createUpdateConcept(new Concept("2", "Concept 2 on MAIN/A"), "MAIN/A");
+		
+		// Create MAIN/B
+		branchService.create("MAIN/B");
+		
+		// Before dependency: MAIN/B sees only MAIN version
+		assertEquals("Concept on MAIN", conceptService.findConcept("1", "MAIN/B").getTerm());
+		
+		// Configure MAIN/B to depend on MAIN/A (triggers MultiBranchCriteria)
+		Map<String, Object> metadata = new HashMap<>();
+		metadata.put(VersionControlHelper.ADDITIONAL_DEPENDENT_BRANCHES, List.of("MAIN/A"));
+		branchService.updateMetadata("MAIN/B", metadata);
+		
+		// After dependency: MAIN/B should see MAIN/A's version
+		Concept result = conceptService.findConcept("1", "MAIN/B");
+		assertNotNull(result);
+		assertEquals("Updated in MAIN/A", result.getTerm(), 
+				"Should see MAIN/A's version (MAIN version excluded by version replaced)");
+		assertEquals("MAIN/A", result.getPath());
+
+		// Concept 2 from MAIN/A should be visible via the dependency
+		result = conceptService.findConcept("2", "MAIN/B");
+		assertNotNull(result);
+		assertEquals("MAIN/A", result.getPath(), "Concept 2 comes from MAIN/A (the dependency)");
+
+		// Now update concept 2 on MAIN/B - this creates a version replacement
+		concept = conceptService.findConcept("2", "MAIN/B");
+		concept.setTerm("Updated in MAIN/B");
+		conceptService.createUpdateConcept(concept, "MAIN/B");
+
+		// After updating, concept 2 should now come from MAIN/B
+		result = conceptService.findConcept("2", "MAIN/B");
+		assertNotNull(result);
+		assertEquals("MAIN/B", result.getPath(), "Concept 2 now comes from MAIN/B after local update");
+	}
+
+
+	@Test
+	void testMultiBranchCriteriaWithOverrides() {
+		// Create MAIN with a concept
+		branchService.create("MAIN");
+		conceptService.createUpdateConcept(new Concept("1", "Concept on MAIN"), "MAIN");
+
+		// Create MAIN/A and update the concept (creates version replacement)
+		branchService.create("MAIN/A");
+		Concept concept = conceptService.findConcept("1", "MAIN/A");
+		assertNotNull(concept, "MAIN/A should see MAIN's content on creation");
+		assertEquals("Concept on MAIN", concept.getTerm(), "MAIN/A initially sees MAIN version");
+
+		concept.setTerm("Updated in MAIN/A");
+		conceptService.createUpdateConcept(concept, "MAIN/A");
+
+		// Verify MAIN/A now has its own version with version replacement recorded
+		assertEquals("Updated in MAIN/A", conceptService.findConcept("1", "MAIN/A").getTerm());
+		Map<String, Set<String>> versionsReplacedA = branchService.findLatest("MAIN/A").getVersionsReplaced();
+		assertNotNull(versionsReplacedA.get("Concept"), "MAIN/A should have version replacements");
+		assertEquals(1, versionsReplacedA.get("Concept").size(), "MAIN/A replaced 1 version from MAIN");
+
+		// Create MAIN/B
+		branchService.create("MAIN/B");
+
+		// Configure MAIN/B to depend on MAIN/A (triggers MultiBranchCriteria)
+		Map<String, Object> metadata = new HashMap<>();
+		metadata.put(VersionControlHelper.ADDITIONAL_DEPENDENT_BRANCHES, List.of("MAIN/A"));
+		branchService.updateMetadata("MAIN/B", metadata);
+
+		// It should see the version from MAIN/A
+		Concept result = conceptService.findConcept("1", "MAIN/B");
+		assertNotNull(result);
+		assertEquals("Updated in MAIN/A", result.getTerm(),
+				"Should see MAIN/A's version (MAIN version excluded by version replaced)");
+		assertEquals("MAIN/A", result.getPath());
+
+		// Updates 1 on MAIN/B
+		concept.setTerm("Updated in MAIN/B");
+		conceptService.createUpdateConcept(concept, "MAIN/B");
+		// Verify version should be on MAIN/B
+		concept = conceptService.findConcept("1", "MAIN/B");
+		assertEquals("Updated in MAIN/B", concept.getTerm());
+
+		Branch taskA = branchService.create("MAIN/B/TASKA");
+		result = conceptService.findConcept("1", taskA.getPath());
+		assertNotNull(result);
+		assertEquals("Updated in MAIN/B", result.getTerm(),
+				"Should see MAIN/B's version (MAIN/A version excluded by version replaced)");
+		assertEquals("MAIN/B", result.getPath());
+
+	}
+
 	@AfterEach
 	void tearDown() {
 		branchService.deleteAll();

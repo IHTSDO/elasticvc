@@ -180,7 +180,7 @@ public class VersionControlHelper {
 			multiBranchCriteria.add(getBranchCriteria(branch, timepoint, versionsReplaced, contentSelection, commit, false));
 			for (String dependentPath : additionalDependencies) {
 				Branch dependentBranch = branchService.findBranchOrThrow(dependentPath);
-				BranchCriteria dependent = getBranchCriteria(dependentBranch, dependentBranch.getHead(), versionsReplaced, contentSelection, commit, true);
+				BranchCriteria dependent = getBranchCriteria(dependentBranch, dependentBranch.getHead(), dependentBranch.getVersionsReplaced(), contentSelection, commit, true);
 				multiBranchCriteria.add(dependent);
 			}
 			return multiBranchCriteria;
