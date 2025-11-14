@@ -11,6 +11,16 @@ import java.util.Date;
 
 public class Entity {
 
+	public static final class Fields {
+		public static final String START = "start";
+		public static final String PATH = "path";
+		public static final String END = "end";
+
+		private Fields() {
+			// Utility class - prevent instantiation
+		}
+	}
+
 	public static final String DATE_FORMAT_STRING = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 	public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT_STRING);
 

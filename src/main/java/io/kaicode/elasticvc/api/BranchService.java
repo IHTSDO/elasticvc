@@ -25,6 +25,7 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.SearchHitsIterator;
+import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
@@ -261,10 +262,10 @@ public class BranchService {
 		SearchHits<Branch> response = elasticsearchOperations.search(new NativeQueryBuilder()
 				.withQuery(bool(b -> b
 						.must(termQuery("path", path))
-						.must(range(rq -> rq.field("start").lte(of(timepoint.getTime()))))
+						.must(range(rq -> rq.untyped(urq -> urq.field("start").lte(of(timepoint.getTime())))))
 						.must(bool(bq -> bq
 								.should(bool(eb -> eb.mustNot(existsQuery("end"))))
-								.should(range(r -> r.field("end").gt(of(timepoint.getTime()))))))))
+								.should(range(r -> r.untyped(urq -> urq.field("end").gt(of(timepoint.getTime())))))))))
 				.withSort(sb -> sb.field(f -> f.field("start")))
 				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class, elasticsearchOperations.getIndexCoordinatesFor(Branch.class));
@@ -579,10 +580,11 @@ public class BranchService {
 
 	private void doContentRollback(String path, String promotionSourceBranch, long timestamp, Collection<Class<? extends DomainEntity<?>>> domainTypes) {
 		logger.info("Deleting documents on {} started at {}.", path, timestamp);
-		Query deleteQuery = new NativeQueryBuilder()
+		Query query = new NativeQueryBuilder()
 				.withQuery(bool(b -> b
 				.must(termQuery("path", path))
 				.must(termQuery("start", timestamp)))).build();
+		DeleteQuery deleteQuery = DeleteQuery.builder(query).build();
 		for (Class<? extends DomainEntity<?>> domainEntityClass : domainTypes) {
 			elasticsearchOperations.delete(deleteQuery, domainEntityClass, elasticsearchOperations.getIndexCoordinatesFor(domainEntityClass));
 			elasticsearchOperations.indexOps(domainEntityClass).refresh();
@@ -601,7 +603,7 @@ public class BranchService {
 					.withQuery(bool(b -> b
 							.must(termQuery("end", timestamp))
 							.must(termsQuery("path", branchPaths))))
-					.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
+					.withSourceFilter(new FetchSourceFilter(true, new String[]{"internalId"}, null))
 					.withPageable(LARGE_PAGE).build();
 			try (final SearchHitsIterator<? extends DomainEntity<?>> endedDocs = elasticsearchOperations.searchForStream(endedDocumentQuery, type)) {
 				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getContent().getInternalId()));
