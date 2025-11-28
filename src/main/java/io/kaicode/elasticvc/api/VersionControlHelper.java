@@ -25,7 +25,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
-import static co.elastic.clients.json.JsonData.*;
 import static io.kaicode.elasticvc.api.VersionControlHelper.ContentSelection.CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY;
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
 
@@ -121,11 +120,12 @@ public class VersionControlHelper {
 	@SuppressWarnings("unused")
 	public BoolQuery.Builder getUpdatesOnBranchDuringRangeCriteria(String path, Date start, Date end) {
 		final Branch branch = getBranchOrThrow(path);
+		BoolQuery.Builder innerBool = bool()
+				.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).gte(String.valueOf(start.getTime())).lte(String.valueOf(end.getTime())))))
+				.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.END).gte(String.valueOf(start.getTime())).lte(String.valueOf(end.getTime())))));
 		return bool()
-				.must(termQuery("path", branch.getPath()))
-				.must(bool(bq -> bq.should(range(rq -> rq.field("start").gte(of(start.getTime())).lte(of(end.getTime()))))
-									.should(range(rq -> rq.field("end").gte(of(start.getTime())).lte(of(end.getTime())))))
-					);
+				.must(termQuery(Entity.Fields.PATH, branch.getPath()))
+				.must(innerBool.build()._toQuery());
 	}
 
 	@SuppressWarnings("unused")
@@ -148,11 +148,10 @@ public class VersionControlHelper {
 				final long endTime = endDate.getTime();
 				shouldsQuery.should(
 						bool(b -> b
-								.must(termQuery("path", startBranchTimepoint.getPath()))
-								.must(bool(bq -> bq.should(range(rq -> rq.field("start").gte(of(startTime)).lte(of(endTime))))
-										         .should(range(rq -> rq.field("end").gte(of(startTime)).lte(of(endTime)))))
-								))
-						);
+								.must(termQuery(Entity.Fields.PATH, startBranchTimepoint.getPath()))
+								.must(bool(bq -> bq
+										.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).gte(String.valueOf(startTime)).lte(String.valueOf(endTime)))))
+										.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.END).gte(String.valueOf(startTime)).lte(String.valueOf(endTime)))))))));
 			}
 		}
 		return bool().must(shouldsQuery.build()._toQuery());
@@ -194,15 +193,15 @@ public class VersionControlHelper {
 		// We will use a 'should' clause to select content from each branch that can match (usually this branch and ancestors).
 
 		final BoolQuery.Builder branchQueryBuilder = bool();
-		final BoolQuery.Builder thisBranchShouldClause = bool().must(termQuery("path", branch.getPath()));
+		final BoolQuery.Builder thisBranchShouldClause = bool().must(termQuery(Entity.Fields.PATH, branch.getPath()));
 		Map<String, Set<String>> allEntityVersionsReplaced = null;
 		switch (contentSelection) {
 			case STANDARD_SELECTION -> {
 				// On this branch and started and (not ended or ended later)
-				thisBranchShouldClause.must(range(rq -> rq.field("start").lte(of(timepoint.getTime()))));
+				thisBranchShouldClause.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lte(String.valueOf(timepoint.getTime())))));
 				thisBranchShouldClause.must(bool(b -> b
-						.should(bool(bq -> bq.mustNot(existsQuery("end"))))
-						.should(range(rq -> rq.field("end").gt(of(timepoint.getTime()))))
+						.should(bool(bq -> bq.mustNot(existsQuery(Entity.Fields.END))))
+						.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.END).gt(String.valueOf(timepoint.getTime())))))
 				));
 				// Or any parent branch within time constraints
 
@@ -210,28 +209,28 @@ public class VersionControlHelper {
 			}
 			case STANDARD_SELECTION_BEFORE_THIS_COMMIT -> {
 				// On this branch and started not ended
-				thisBranchShouldClause.must(range(rq -> rq.field("start").lte(of(timepoint.getTime()))));
+				thisBranchShouldClause.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lte(String.valueOf(timepoint.getTime())))));
 				thisBranchShouldClause.must(
 						bool(b -> b
-								.should(bool(bq -> bq.mustNot(existsQuery("end"))))
-								.should(termQuery("end", commit.getTimepoint().getTime())))
+								.should(bool(bq -> bq.mustNot(existsQuery(Entity.Fields.END))))
+								.should(termQuery(Entity.Fields.END, commit.getTimepoint().getTime())))
 				);
 				// Or any parent branch within time constraints
 				allEntityVersionsReplaced = addParentCriteriaRecursively(branchQueryBuilder, branch, versionsReplaced, skipRoot);
 			}
 			case CHANGES_ON_THIS_BRANCH_ONLY ->
 				// On this branch and started not ended
-					thisBranchShouldClause.must(range(rq -> rq.field("start").lte(of(timepoint.getTime()))))
-							.mustNot(existsQuery("end"));
+					thisBranchShouldClause.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lte(String.valueOf(timepoint.getTime())))))
+							.mustNot(existsQuery(Entity.Fields.END));
 			case CHANGES_IN_THIS_COMMIT_ONLY ->
 				// On this branch and started at commit date, not ended
-					thisBranchShouldClause.must(termQuery("start", timepoint.getTime()))
-							.mustNot(existsQuery("end"));
+					thisBranchShouldClause.must(termQuery(Entity.Fields.START, timepoint.getTime()))
+							.mustNot(existsQuery(Entity.Fields.END));
 			case CHANGES_AND_DELETIONS_IN_THIS_COMMIT_ONLY -> {
 				// Include versions just deleted in this commit, from any ancestor
 				thisBranchShouldClause.must(bool(b -> b
-						.should(termQuery("start", timepoint.getTime()))
-						.should(termQuery("end", timepoint.getTime()))));
+						.should(termQuery(Entity.Fields.START, timepoint.getTime()))
+						.should(termQuery(Entity.Fields.END, timepoint.getTime()))));
 				// Include versions just deleted in this commit, from any ancestor
 				branchQueryBuilder.should(termsQuery("_id", commit.getEntityVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
 				if (commit.isRebase()) {
@@ -255,11 +254,11 @@ public class VersionControlHelper {
 					for (BranchTimeRange branchTimeRange : branchTimeRanges) {
 						// Add other should clauses for other branches
 						branchQueryBuilder.should(bool(b -> b
-								.must(termQuery("path", branchTimeRange.path()))
-								.must(range(rq -> rq.field("start").gt(of(branchTimeRange.start().getTime()))))
+								.must(termQuery(Entity.Fields.PATH, branchTimeRange.path()))
+								.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).gt(String.valueOf(branchTimeRange.start().getTime())))))
 								.must(bool(bq -> bq
-												.should(bool(sb -> sb.mustNot(exists(eq -> eq.field("end")))))
-												.should(range(rq -> rq.field("end").lte(of(branchTimeRange.end().getTime()))))
+												.should(bool(sb -> sb.mustNot(exists(eq -> eq.field(Entity.Fields.END)))))
+												.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.END).lte(String.valueOf(branchTimeRange.end().getTime())))))
 										)
 								)));
 					}
@@ -268,16 +267,16 @@ public class VersionControlHelper {
 			case UNPROMOTED_CHANGES_AND_DELETIONS_ON_THIS_BRANCH -> {
 				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
 				thisBranchShouldClause.must(bool(b -> b
-						.should(range(rq -> rq.field("start").gte(of(startPoint.getTime()))))
-						.should(range(rq -> rq.field("end").gte(of(startPoint.getTime()))))));
+						.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).gte(String.valueOf(startPoint.getTime())))))
+						.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.END).gte(String.valueOf(startPoint.getTime())))))));
 				// Include versions deleted on this branch, from any ancestor
 				branchQueryBuilder.should(termsQuery("_id", branch.getVersionsReplaced().values().stream().flatMap(Collection::stream).collect(Collectors.toSet())));
 			}
 			case UNPROMOTED_CHANGES_ON_THIS_BRANCH -> {
 				Date startPoint = branch.getLastPromotion() != null ? branch.getLastPromotion() : branch.getCreation();
 				thisBranchShouldClause
-						.must(range(rq -> rq.field("start").gte(of(startPoint.getTime()))))
-						.mustNot(existsQuery("end"));
+						.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).gte(String.valueOf(startPoint.getTime())))))
+						.mustNot(existsQuery(Entity.Fields.END));
 			}
 		}
 		// Nest branch criteria in a 'must' clause so its 'should' clauses are not ignored if 'must' clauses are added to the query builder.
@@ -309,11 +308,11 @@ public class VersionControlHelper {
 			MapUtil.addAll(parentBranch.getVersionsReplaced(), versionsReplaced);
 			final Date base = branch.getBase();
 			branchCriteria.should(bool(b -> b
-					.must(termQuery("path", parentBranch.getPath()))
-					.must(range(rq -> rq.field("start").lte(of(base.getTime()))))
+					.must(termQuery(Entity.Fields.PATH, parentBranch.getPath()))
+					.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lte(String.valueOf(base.getTime())))))
 					.must(bool(bq -> bq
-							.should(bool(sb -> sb.mustNot(existsQuery("end"))))
-							.should(range(rq -> rq.field("end").gt(of(base.getTime()))))))
+							.should(bool(sb -> sb.mustNot(existsQuery(Entity.Fields.END))))
+							.should(range(rq -> rq.date(drq -> drq.field(Entity.Fields.END).gt(String.valueOf(base.getTime())))))))
 			));
 			return addParentCriteriaRecursively(branchCriteria, parentBranch, versionsReplaced, skipRoot);
 		}
@@ -343,10 +342,10 @@ public class VersionControlHelper {
 		final NativeQuery query = new NativeQueryBuilder()
 				.withQuery(bool(b -> b
 						.must(getBranchCriteriaIncludingOpenCommit(commit).getEntityBranchCriteria(entityClass))
-						.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
-						.mustNot(termQuery("path", commit.getBranch().getPath()))))
+						.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lt(String.valueOf(commit.getTimepoint().getTime())))))
+						.mustNot(termQuery(Entity.Fields.PATH, commit.getBranch().getPath()))))
 				.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
-				.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
+				.withSourceFilter(new FetchSourceFilter(true, new String[]{"internalId"}, null))
 				.withPageable(LARGE_PAGE)
 				.build();
 
@@ -423,9 +422,9 @@ public class VersionControlHelper {
 		final NativeQuery query = new NativeQueryBuilder()
 				.withQuery(
 						bool(b -> b
-								.must(termQuery("path", commit.getBranch().getPath()))
-								.must(range(rq -> rq.field("start").lt(of(commit.getTimepoint().getTime()))))
-								.mustNot(existsQuery("end"))))
+								.must(termQuery(Entity.Fields.PATH, commit.getBranch().getPath()))
+								.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lt(String.valueOf(commit.getTimepoint().getTime())))))
+								.mustNot(existsQuery(Entity.Fields.END))))
 				.withFilter(filterBuilder.build()._toQuery())
 				.withPageable(LARGE_PAGE)
 				.build();

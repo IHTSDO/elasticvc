@@ -7,10 +7,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
-import io.kaicode.elasticvc.domain.Branch;
-import io.kaicode.elasticvc.domain.Commit;
-import io.kaicode.elasticvc.domain.DomainEntity;
-import io.kaicode.elasticvc.domain.Metadata;
+import io.kaicode.elasticvc.domain.*;
 import io.kaicode.elasticvc.repositories.BranchRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +22,7 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.SearchHitsIterator;
+import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
@@ -35,7 +33,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
-import static co.elastic.clients.json.JsonData.of;
 import static io.kaicode.elasticvc.api.VersionControlHelper.LARGE_PAGE;
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
 import static java.util.stream.Collectors.toList;
@@ -184,15 +181,15 @@ public class BranchService {
 	private NativeQuery getBranchQuery(String path, boolean includeParent) {
 		Assert.notNull(path, "The path argument is required, it must not be null.");
 
-		final BoolQuery.Builder pathClauses = bool().should(termQuery("path", path));
+		final BoolQuery.Builder pathClauses = bool().should(termQuery(Entity.Fields.PATH, path));
 		if (includeParent && path.contains(PathUtil.SEPARATOR)) {
 			// Pick up the parent branch too
-			pathClauses.should(termQuery("path", PathUtil.getParentPath(path)));
+			pathClauses.should(termQuery(Entity.Fields.PATH, PathUtil.getParentPath(path)));
 		}
 
 		return new NativeQueryBuilder().withQuery(
 				bool(bq -> bq.must(pathClauses.build()._toQuery())
-						     .mustNot(existsQuery("end"))
+						     .mustNot(existsQuery(Entity.Fields.END))
 				)).build();
 	}
 
@@ -234,8 +231,8 @@ public class BranchService {
 	public Branch findFirstVersionOrThrow(String path) {
 		List<Branch> branchVersions = elasticsearchOperations.search(
 				new NativeQueryBuilder()
-						.withQuery(termQuery("path", path))
-						.withSort(s -> s.field(fb -> fb.field("start")))
+						.withQuery(termQuery(Entity.Fields.PATH, path))
+						.withSort(s -> s.field(fb -> fb.field(Entity.Fields.START)))
 						.withPageable(PageRequest.of(0, 1))
 						.build(), Branch.class)
 				.stream().map(SearchHit::getContent).toList();
@@ -249,8 +246,8 @@ public class BranchService {
 	public Page<Branch> findAllVersions(String path, Pageable pageable) {
 		SearchHits<Branch> results = elasticsearchOperations.search(
 				new NativeQueryBuilder()
-						.withQuery(termQuery("path", path))
-						.withSort(s -> s.field(fb -> fb.field("start")))
+						.withQuery(termQuery(Entity.Fields.PATH, path))
+						.withSort(s -> s.field(fb -> fb.field(Entity.Fields.START)))
 						.withPageable(pageable)
 						.build(), Branch.class);
 
@@ -260,12 +257,12 @@ public class BranchService {
 	public Branch findAtTimepointOrThrow(String path, Date timepoint) {
 		SearchHits<Branch> response = elasticsearchOperations.search(new NativeQueryBuilder()
 				.withQuery(bool(b -> b
-						.must(termQuery("path", path))
-						.must(range(rq -> rq.field("start").lte(of(timepoint.getTime()))))
+						.must(termQuery(Entity.Fields.PATH, path))
+						.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lte(String.valueOf(timepoint.getTime())))))
 						.must(bool(bq -> bq
-								.should(bool(eb -> eb.mustNot(existsQuery("end"))))
-								.should(range(r -> r.field("end").gt(of(timepoint.getTime()))))))))
-				.withSort(sb -> sb.field(f -> f.field("start")))
+								.should(bool(eb -> eb.mustNot(existsQuery(Entity.Fields.END))))
+								.should(range(r -> r.date(drq -> drq.field(Entity.Fields.END).gt(String.valueOf(timepoint.getTime())))))))))
+				.withSort(sb -> sb.field(f -> f.field(Entity.Fields.START)))
 				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class, elasticsearchOperations.getIndexCoordinatesFor(Branch.class));
 
@@ -273,8 +270,8 @@ public class BranchService {
 		response.stream().forEach(r -> branches.add(r.getContent()));
 		if (branches.isEmpty()) {
 			SearchHits<Branch> mostRecentSearch = elasticsearchOperations.search(new NativeQueryBuilder()
-					.withQuery(bool(b -> b.must(termQuery("path", path))))
-					.withSort(sb -> sb.field(fb -> fb.field("start").order(SortOrder.Desc)))	// Descending
+					.withQuery(bool(b -> b.must(termQuery(Entity.Fields.PATH, path))))
+					.withSort(sb -> sb.field(fb -> fb.field(Entity.Fields.START).order(SortOrder.Desc)))	// Descending
 					.withPageable(PageRequest.of(0, 30))
 					.build(), Branch.class, elasticsearchOperations.getIndexCoordinatesFor(Branch.class));
 			final List<Branch> last30 = new ArrayList<>();
@@ -293,8 +290,8 @@ public class BranchService {
 
 	public List<Branch> findAll() {
 		SearchHits<Branch> searchHits = elasticsearchOperations.search(new NativeQueryBuilder()
-				.withQuery(bool(b -> b.mustNot(eb -> eb.exists(ef -> ef.field("end")))))
-				.withSort(sb -> sb.field(fb -> fb.field("path")))
+				.withQuery(bool(b -> b.mustNot(eb -> eb.exists(ef -> ef.field(Entity.Fields.END)))))
+				.withSort(sb -> sb.field(fb -> fb.field(Entity.Fields.PATH)))
 				.withPageable(PageRequest.of(0, 10000))
 				.build(), Branch.class);
 		List<Branch> all = new ArrayList<>();
@@ -307,11 +304,11 @@ public class BranchService {
 	}
 
 	public List<Branch> findChildren(String path, boolean immediateChildren) {
-		// mustNot(existsQuery("end")).must(prefixQuery("path", path + "/"))
+		// mustNot(existsQuery(Entity.Fields.END)).must(prefixQuery(Entity.Fields.PATH, path + "/"))
 		SearchHits<Branch> results = elasticsearchOperations.search(NativeQuery.builder()
-				.withQuery(q -> q.bool(BoolQuery.of(b -> b.mustNot(QueryBuilders.exists().field("end").build()._toQuery())
-						.must(prefix().field("path").value(path + "/").build()._toQuery()))))
-				.withSort(sb -> sb.field(fb -> fb.field("path")))
+				.withQuery(q -> q.bool(BoolQuery.of(b -> b.mustNot(QueryBuilders.exists().field(Entity.Fields.END).build()._toQuery())
+						.must(prefix().field(Entity.Fields.PATH).value(path + "/").build()._toQuery()))))
+				.withSort(sb -> sb.field(fb -> fb.field(Entity.Fields.PATH)))
 				.build(), Branch.class);
 
 		final List<Branch> children = new ArrayList<>();
@@ -579,10 +576,11 @@ public class BranchService {
 
 	private void doContentRollback(String path, String promotionSourceBranch, long timestamp, Collection<Class<? extends DomainEntity<?>>> domainTypes) {
 		logger.info("Deleting documents on {} started at {}.", path, timestamp);
-		Query deleteQuery = new NativeQueryBuilder()
+		Query query = new NativeQueryBuilder()
 				.withQuery(bool(b -> b
-				.must(termQuery("path", path))
-				.must(termQuery("start", timestamp)))).build();
+				.must(termQuery(Entity.Fields.PATH, path))
+				.must(termQuery(Entity.Fields.START, timestamp)))).build();
+		DeleteQuery deleteQuery = DeleteQuery.builder(query).build();
 		for (Class<? extends DomainEntity<?>> domainEntityClass : domainTypes) {
 			elasticsearchOperations.delete(deleteQuery, domainEntityClass, elasticsearchOperations.getIndexCoordinatesFor(domainEntityClass));
 			elasticsearchOperations.indexOps(domainEntityClass).refresh();
@@ -599,9 +597,9 @@ public class BranchService {
 			Set<String> endedDocumentIds = new HashSet<>();
 			NativeQuery endedDocumentQuery = new NativeQueryBuilder()
 					.withQuery(bool(b -> b
-							.must(termQuery("end", timestamp))
-							.must(termsQuery("path", branchPaths))))
-					.withSourceFilter(new FetchSourceFilter(new String[]{"internalId"}, null))
+							.must(termQuery(Entity.Fields.END, timestamp))
+							.must(termsQuery(Entity.Fields.PATH, branchPaths))))
+					.withSourceFilter(new FetchSourceFilter(true, new String[]{"internalId"}, null))
 					.withPageable(LARGE_PAGE).build();
 			try (final SearchHitsIterator<? extends DomainEntity<?>> endedDocs = elasticsearchOperations.searchForStream(endedDocumentQuery, type)) {
 				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getContent().getInternalId()));
@@ -640,8 +638,8 @@ public class BranchService {
 	public void unlock(String path) {
 		final List<Branch> branches = elasticsearchOperations.search(new NativeQueryBuilder()
 				.withQuery(bool(bq -> bq
-						.must(termQuery("path", path))
-						.mustNot(existsQuery("end"))))
+						.must(termQuery(Entity.Fields.PATH, path))
+						.mustNot(existsQuery(Entity.Fields.END))))
 				.withPageable(PageRequest.of(0, 1))
 				.build(), Branch.class)
 				.stream().map(SearchHit::getContent).toList();
