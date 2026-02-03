@@ -1,20 +1,20 @@
 package io.kaicode.elasticvc.domain;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class BranchTest {
+class BranchTest {
 
 	@Test
-	public void testIsParent() {
-		Assert.assertTrue(new Branch("MAIN").isParent(new Branch("MAIN/A")));
-		Assert.assertTrue(new Branch("MAIN/A").isParent(new Branch("MAIN/A/B")));
+	void testIsParent() {
+		assertTrue(new Branch("MAIN").isParent(new Branch("MAIN/A")));
+		assertTrue(new Branch("MAIN/A").isParent(new Branch("MAIN/A/B")));
 
-		Assert.assertFalse(new Branch("MAIN").isParent(new Branch("MAIN")));
-		Assert.assertFalse(new Branch("MAIN/A").isParent(new Branch("MAIN/A")));
-		Assert.assertFalse(new Branch("MAIN").isParent(new Branch("MAIN/A/B")));
-		Assert.assertFalse(new Branch("MAIN/A").isParent(new Branch("MAIN")));
-		Assert.assertFalse(new Branch("MAIN/A").isParent(new Branch("MAIN/B")));
+		assertFalse(new Branch("MAIN").isParent(new Branch("MAIN")));
+		assertFalse(new Branch("MAIN/A").isParent(new Branch("MAIN/A")));
+		assertFalse(new Branch("MAIN").isParent(new Branch("MAIN/A/B")));
+		assertFalse(new Branch("MAIN/A").isParent(new Branch("MAIN")));
+		assertFalse(new Branch("MAIN/A").isParent(new Branch("MAIN/B")));
 	}
 
 }
