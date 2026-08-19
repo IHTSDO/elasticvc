@@ -599,7 +599,7 @@ public class BranchService {
 					.withQuery(bool(b -> b
 							.must(termQuery(Entity.Fields.END, timestamp))
 							.must(termsQuery(Entity.Fields.PATH, branchPaths))))
-					.withSourceFilter(new FetchSourceFilter(true, new String[]{"internalId"}, null))
+					.withSourceFilter(new FetchSourceFilter(null, new String[]{"internalId"}, null))
 					.withPageable(LARGE_PAGE).build();
 			try (final SearchHitsIterator<? extends DomainEntity<?>> endedDocs = elasticsearchOperations.searchForStream(endedDocumentQuery, type)) {
 				endedDocs.forEachRemaining(d -> endedDocumentIds.add(d.getContent().getInternalId()));
