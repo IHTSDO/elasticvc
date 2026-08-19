@@ -345,7 +345,7 @@ public class VersionControlHelper {
 						.must(range(rq -> rq.date(drq -> drq.field(Entity.Fields.START).lt(String.valueOf(commit.getTimepoint().getTime())))))
 						.mustNot(termQuery(Entity.Fields.PATH, commit.getBranch().getPath()))))
 				.withFilter(bool(bf -> bf.must(termsQuery(idField, ids))))
-				.withSourceFilter(new FetchSourceFilter(true, new String[]{"internalId"}, null))
+				.withSourceFilter(new FetchSourceFilter(null, new String[]{"internalId"}, null))
 				.withPageable(LARGE_PAGE)
 				.build();
 
