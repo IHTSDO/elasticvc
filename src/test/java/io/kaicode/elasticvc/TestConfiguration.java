@@ -1,6 +1,6 @@
 package io.kaicode.elasticvc;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kaicode.elasticvc.api.ComponentService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.example.domain.Concept;
@@ -31,7 +31,7 @@ public class TestConfiguration extends ElasticsearchConfiguration {
 	@Autowired
 	private ElasticsearchOperations elasticsearchOperations;
 
-	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:8.11.1";
+	private static final String ELASTIC_SEARCH_DOCKER = "docker.elastic.co/elasticsearch/elasticsearch:9.5.2";
 
 	@Container
 	private static final ElasticsearchContainer elasticsearchContainer;

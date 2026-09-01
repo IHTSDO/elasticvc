@@ -1,9 +1,8 @@
 package io.kaicode.elasticvc.api;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +28,7 @@ public class BranchMetadataHelper {
 			} else {
 				try {
 					flatMap.put(key, OBJECT_PREFIX + objectMapper.writeValueAsString(object));
-				} catch (JsonProcessingException e) {
+				} catch (JacksonException e) {
 					throw new ElasticVCRuntimeException("Failed to serialise branch metadata", e);
 				}
 			}
@@ -51,7 +50,7 @@ public class BranchMetadataHelper {
 					} else {
 						fatMap.put(key, objectMapper.readValue(stringValue, Map.class));
 					}
-				} catch (IOException e) {
+				} catch (JacksonException e) {
 					throw new ElasticVCRuntimeException("Failed to deserialise branch metadata", e);
 				}
 			} else {

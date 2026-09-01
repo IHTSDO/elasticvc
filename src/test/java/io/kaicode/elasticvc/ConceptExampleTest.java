@@ -288,20 +288,20 @@ class ConceptExampleTest extends AbstractTest {
 	void testMultiBranchCriteria() {
 		// Test that version replaced works correctly in MultiBranchCriteria
 		// Scenario: MAIN/B depends on MAIN/A via ADDITIONAL_DEPENDENT_BRANCHES
-		
+
 		// Create MAIN with a concept
 		branchService.create("MAIN");
 		conceptService.createUpdateConcept(new Concept("1", "Concept on MAIN"), "MAIN");
-		
+
 		// Create MAIN/A and update the concept (creates version replacement)
 		branchService.create("MAIN/A");
 		Concept concept = conceptService.findConcept("1", "MAIN/A");
 		assertNotNull(concept, "MAIN/A should see MAIN's content on creation");
 		assertEquals("Concept on MAIN", concept.getTerm(), "MAIN/A initially sees MAIN version");
-		
+
 		concept.setTerm("Updated in MAIN/A");
 		conceptService.createUpdateConcept(concept, "MAIN/A");
-		
+
 		// Verify MAIN/A now has its own version with version replacement recorded
 		assertEquals("Updated in MAIN/A", conceptService.findConcept("1", "MAIN/A").getTerm());
 		Map<String, Set<String>> versionsReplacedA = branchService.findLatest("MAIN/A").getVersionsReplaced();
@@ -309,22 +309,22 @@ class ConceptExampleTest extends AbstractTest {
 		assertEquals(1, versionsReplacedA.get("Concept").size(), "MAIN/A replaced 1 version from MAIN");
 
 		conceptService.createUpdateConcept(new Concept("2", "Concept 2 on MAIN/A"), "MAIN/A");
-		
+
 		// Create MAIN/B
 		branchService.create("MAIN/B");
-		
+
 		// Before dependency: MAIN/B sees only MAIN version
 		assertEquals("Concept on MAIN", conceptService.findConcept("1", "MAIN/B").getTerm());
-		
+
 		// Configure MAIN/B to depend on MAIN/A (triggers MultiBranchCriteria)
 		Map<String, Object> metadata = new HashMap<>();
 		metadata.put(VersionControlHelper.ADDITIONAL_DEPENDENT_BRANCHES, List.of("MAIN/A"));
 		branchService.updateMetadata("MAIN/B", metadata);
-		
+
 		// After dependency: MAIN/B should see MAIN/A's version
 		Concept result = conceptService.findConcept("1", "MAIN/B");
 		assertNotNull(result);
-		assertEquals("Updated in MAIN/A", result.getTerm(), 
+		assertEquals("Updated in MAIN/A", result.getTerm(),
 				"Should see MAIN/A's version (MAIN version excluded by version replaced)");
 		assertEquals("MAIN/A", result.getPath());
 
