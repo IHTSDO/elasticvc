@@ -272,6 +272,30 @@ public class BranchServiceTest extends AbstractTest {
 	}
 
 	@Test
+	void testFailedPromotionOpenReleasesSourceLock() {
+		branchService.create("MAIN");
+		branchService.create("MAIN/A");
+		branchService.lockBranch("MAIN", "Other operation");
+
+		assertThrows(IllegalStateException.class, () -> branchService.openPromotionCommit("MAIN", "MAIN/A"));
+
+		assertFalse(branchService.findBranchOrThrow("MAIN/A").isLocked());
+	}
+
+	@Test
+	void testFailedPromotionOpenKeepsTargetLockOfOtherOperation() {
+		branchService.create("MAIN");
+		branchService.create("MAIN/A");
+		branchService.lockBranch("MAIN", "Other operation");
+
+		assertThrows(IllegalStateException.class, () -> branchService.openPromotionCommit("MAIN", "MAIN/A"));
+
+		Branch main = branchService.findBranchOrThrow("MAIN");
+		assertTrue(main.isLocked());
+		assertEquals("Other operation", main.getMetadata().getString(BranchService.LOCK_METADATA_KEY));
+	}
+
+	@Test
 	void testIndexConfigs() {
 		IndexCoordinates indexCoordinates = elasticsearchOperations.getIndexCoordinatesFor(Branch.class);
 		assertEquals("test_branch", indexCoordinates.getIndexName());
