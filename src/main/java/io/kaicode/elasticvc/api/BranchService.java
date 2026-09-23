@@ -337,17 +337,37 @@ public class BranchService {
 	private Commit openCommit(String branchPath, String mergeSourceBranchPath, Commit.CommitType commitType, String sourceBranchLockMetadata, String targetBranchLockMetadata) {
 		synchronized (branchLockSyncObject) {
 			Branch sourceBranch = null;
-			if (commitType == Commit.CommitType.PROMOTION) {
-				// Lock source branch as well as target
-				sourceBranch = lockBranch(mergeSourceBranchPath, sourceBranchLockMetadata);
+			Branch branch = null;
+			try {
+				if (commitType == Commit.CommitType.PROMOTION) {
+					// Lock source branch as well as target
+					sourceBranch = lockBranch(mergeSourceBranchPath, sourceBranchLockMetadata);
+				}
+				branch = lockBranch(branchPath, targetBranchLockMetadata);
+				Commit commit = new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
+				if (commitType == Commit.CommitType.PROMOTION) {
+					commit.setVersionsReplacedForPromotion(sourceBranch.getVersionsReplaced());
+				}
+				logger.info("Open commit on {} at {}", branchPath, commit.getTimepoint().getTime());
+				return commit;
+			} catch (RuntimeException e) {
+				releaseAfterFailedOpen(branch, branchPath, e);
+				releaseAfterFailedOpen(sourceBranch, mergeSourceBranchPath, e);
+				throw e;
 			}
-			Branch branch = lockBranch(branchPath, targetBranchLockMetadata);
-			Commit commit = new Commit(branch, commitType, this::completeCommit, this::rollbackCommit);
-			if (commitType == Commit.CommitType.PROMOTION) {
-				commit.setVersionsReplacedForPromotion(sourceBranch.getVersionsReplaced());
-			}
-			logger.info("Open commit on {} at {}", branchPath, commit.getTimepoint().getTime());
-			return commit;
+		}
+	}
+
+	// Only release a lock this call acquired; a lock that could not be acquired belongs to a live operation.
+	private void releaseAfterFailedOpen(Branch acquired, String path, RuntimeException cause) {
+		if (acquired == null) {
+			return;
+		}
+		try {
+			unlock(path);
+		} catch (RuntimeException unlockFailure) {
+			logger.error("Failed to release branch lock on {} after commit open failed.", path, unlockFailure);
+			cause.addSuppressed(unlockFailure);
 		}
 	}
 
