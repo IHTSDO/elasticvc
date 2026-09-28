@@ -681,10 +681,20 @@ public class BranchService {
 	}
 
 	@SuppressWarnings("unused")
+	public void removeCommitListener(CommitListener commitListener) {
+		commitListeners.remove(commitListener);
+	}
+
+	@SuppressWarnings("unused")
 	public void addBranchSaveListener(BranchSaveListener listener) {
 		if (!branchSaveListeners.contains(listener)) {
 			branchSaveListeners.add(listener);
 		}
+	}
+
+	@SuppressWarnings("unused")
+	public void removeBranchSaveListener(BranchSaveListener listener) {
+		branchSaveListeners.remove(listener);
 	}
 
 	private Branch illegalState(String message) {

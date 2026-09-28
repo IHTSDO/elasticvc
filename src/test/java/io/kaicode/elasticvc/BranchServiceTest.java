@@ -2,7 +2,9 @@ package io.kaicode.elasticvc;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import io.kaicode.elasticvc.api.BranchSaveListener;
 import io.kaicode.elasticvc.api.BranchService;
+import io.kaicode.elasticvc.api.CommitListener;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
 import io.kaicode.elasticvc.repositories.BranchRepository;
@@ -325,6 +327,47 @@ public class BranchServiceTest extends AbstractTest {
 		} catch (JacksonException e) {
 			throw new RuntimeException("Failed to serialise branch lock metadata", e);
 		}
+	}
+
+	@Test
+	void testRemoveCommitListener() {
+		branchService.create("MAIN");
+		List<String> committedPaths = new ArrayList<>();
+		CommitListener listener = commit -> committedPaths.add(commit.getBranch().getPath());
+
+		branchService.addCommitListener(listener);
+		try (Commit commit = branchService.openCommit("MAIN")) {
+			commit.markSuccessful();
+		}
+		assertEquals(List.of("MAIN"), committedPaths);
+
+		branchService.removeCommitListener(listener);
+		assertFalse(branchService.getCommitListeners().contains(listener));
+		try (Commit commit = branchService.openCommit("MAIN")) {
+			commit.markSuccessful();
+		}
+		assertEquals(List.of("MAIN"), committedPaths, "Removed listener should not be called.");
+	}
+
+	@Test
+	void testRemoveBranchSaveListener() {
+		List<String> savedPaths = new ArrayList<>();
+		BranchSaveListener listener = branch -> savedPaths.add(branch.getPath());
+
+		branchService.addBranchSaveListener(listener);
+		branchService.create("MAIN");
+		try (Commit commit = branchService.openCommit("MAIN")) {
+			commit.markSuccessful();
+		}
+		assertFalse(savedPaths.isEmpty());
+
+		branchService.removeBranchSaveListener(listener);
+		assertFalse(branchService.getBranchSaveListeners().contains(listener));
+		savedPaths.clear();
+		try (Commit commit = branchService.openCommit("MAIN")) {
+			commit.markSuccessful();
+		}
+		assertTrue(savedPaths.isEmpty(), "Removed listener should not be called.");
 	}
 
 	@AfterEach
