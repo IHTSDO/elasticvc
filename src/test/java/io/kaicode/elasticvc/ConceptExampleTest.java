@@ -20,6 +20,7 @@ import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
 import java.util.*;
 
 import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.bool;
+import static io.kaicode.elasticvc.helper.QueryHelper.existsQuery;
 import static io.kaicode.elasticvc.helper.QueryHelper.termQuery;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -395,6 +396,58 @@ class ConceptExampleTest extends AbstractTest {
 				"Should see MAIN/B's version (MAIN/A version excluded by version replaced)");
 		assertEquals("MAIN/B", result.getPath());
 
+	}
+
+	@Test
+	void testRevertedChangeOnChildRestoresParentVersion() {
+		branchService.create("MAIN");
+		conceptService.createUpdateConcept(new Concept("1", "Original"), "MAIN");
+		branchService.create("MAIN/A");
+
+		// Change on child hides the parent version
+		Concept concept = conceptService.findConcept("1", "MAIN/A");
+		concept.setTerm("Changed");
+		conceptService.createUpdateConcept(concept, "MAIN/A");
+		assertEquals("MAIN/A", conceptService.findConcept("1", "MAIN/A").getPath());
+		assertEquals(1, getConceptVersionsReplaced("MAIN/A").size());
+
+		// Reverting the change on child restores the parent version rather than writing an identical copy
+		concept = conceptService.findConcept("1", "MAIN/A");
+		concept.setTerm("Original");
+		conceptService.createUpdateConcept(concept, "MAIN/A");
+
+		Concept restored = conceptService.findConcept("1", "MAIN/A");
+		assertEquals("Original", restored.getTerm());
+		assertEquals("MAIN", restored.getPath(), "Parent version should be visible again.");
+		assertEquals(Collections.emptySet(), getConceptVersionsReplaced("MAIN/A"), "Parent version should no longer be replaced.");
+		assertEquals(0, countCurrentConceptVersionsOnPath("1", "MAIN/A"), "No current version should remain on the child.");
+	}
+
+	@Test
+	void testSaveWithoutContentChangeOnChildDoesNotReplaceParentVersion() {
+		branchService.create("MAIN");
+		conceptService.createUpdateConcept(new Concept("1", "Original"), "MAIN");
+		branchService.create("MAIN/A");
+
+		Concept concept = conceptService.findConcept("1", "MAIN/A");
+		conceptService.createUpdateConcept(concept, "MAIN/A");
+
+		assertEquals("MAIN", conceptService.findConcept("1", "MAIN/A").getPath());
+		assertEquals(Collections.emptySet(), getConceptVersionsReplaced("MAIN/A"));
+		assertEquals(0, countCurrentConceptVersionsOnPath("1", "MAIN/A"));
+	}
+
+	private Set<String> getConceptVersionsReplaced(String branchPath) {
+		return branchService.findLatest(branchPath).getVersionsReplaced().getOrDefault("Concept", Collections.emptySet());
+	}
+
+	private long countCurrentConceptVersionsOnPath(String conceptId, String path) {
+		return elasticsearchOperations.count(new NativeQueryBuilder()
+				.withQuery(bool(b -> b
+						.must(termQuery(Concept.FIELD_ID, conceptId))
+						.must(termQuery("path", path))
+						.mustNot(existsQuery("end"))))
+				.build(), Concept.class);
 	}
 
 	@AfterEach

@@ -43,4 +43,8 @@ public class Concept extends DomainEntity<Concept>{
 	public boolean isComponentChanged(Concept existingComponent) {
 		return !term.equals(existingComponent.term);
 	}
+
+	public boolean isSameContentAs(Concept otherVersion) {
+		return term.equals(otherVersion.term);
+	}
 }
