@@ -470,6 +470,7 @@ public class BranchService {
 		newBranchTimespan.addVersionsReplaced(oldVersionsReplaced);
 
 		newBranchTimespan.addVersionsReplaced(commit.getEntityVersionsReplaced());
+		newBranchTimespan.removeVersionsReplaced(commit.getEntityVersionsRestored());
 		newBranchTimespan.setCreation(oldBranchTimespan.getCreation());
 		newBranchTimespan.setLastPromotion(oldBranchTimespan.getLastPromotion());
 

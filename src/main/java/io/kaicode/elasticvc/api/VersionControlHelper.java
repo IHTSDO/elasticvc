@@ -334,6 +334,48 @@ public class VersionControlHelper {
 		}
 	}
 
+	/**
+	 * Finds the components which have the same content as the version visible on the ancestor branches at this branch's base,
+	 * ignoring any replacement of that version on this branch. The ancestor versions are recorded in the commit as restored.
+	 * @return the ids of the components which should not be persisted.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	<T extends DomainEntity<?>> Set<String> restoreAncestorVersionsWithSameContent(Commit commit, String idField, Class<T> entityClass, Collection<T> components) {
+		final Branch branch = commit.getBranch();
+		if (components.isEmpty() || PathUtil.isRoot(branch.getPath()) || commit.getCommitType() == Commit.CommitType.PROMOTION) {
+			return Collections.emptySet();
+		}
+		final Map<String, T> componentsById = new HashMap<>();
+		components.forEach(component -> componentsById.put(component.getId(), component));
+
+		final Date base = branch.getBase();
+		final Branch parentAtBase = branchService.findAtTimepointOrThrow(PathUtil.getParentPath(branch.getPath()), base);
+		final BranchCriteria parentCriteria = getBranchCriteria(parentAtBase, base, parentAtBase.getVersionsReplaced(), ContentSelection.STANDARD_SELECTION, null);
+		final NativeQuery query = new NativeQueryBuilder()
+				.withQuery(parentCriteria.getEntityBranchCriteria(entityClass))
+				.withFilter(termsQuery(idField, componentsById.keySet()))
+				.withPageable(LARGE_PAGE)
+				.build();
+
+		final Set<String> restoredIds = new HashSet<>();
+		final Set<String> restoredInternalIds = new HashSet<>();
+		try (final SearchHitsIterator<T> ancestorVersions = elasticsearchOperations.searchForStream(query, entityClass)) {
+			ancestorVersions.forEachRemaining(hit -> {
+				T ancestorVersion = hit.getContent();
+				DomainEntity component = componentsById.get(ancestorVersion.getId());
+				if (component != null && component.isSameContentAs(ancestorVersion)) {
+					restoredIds.add(ancestorVersion.getId());
+					restoredInternalIds.add(ancestorVersion.getInternalId());
+				}
+			});
+		}
+		if (!restoredInternalIds.isEmpty()) {
+			commit.addVersionsRestored(restoredInternalIds, entityClass);
+			logger.debug("Restored {} {} {}", restoredInternalIds.size(), entityClass.getSimpleName(), restoredInternalIds);
+		}
+		return restoredIds;
+	}
+
 	<T extends DomainEntity<?>> void endOldVersions(Commit commit, String idField, Class<T> entityClass, Collection<?> ids, ElasticsearchRepository<T, String> repository) {
 		// End versions of the entity on this path by setting end date
 		endOldVersionsOnThisBranch(entityClass, ids, idField, null, commit, repository);

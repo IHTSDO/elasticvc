@@ -20,6 +20,12 @@ public class Commit implements AutoCloseable {
 	 */
 	private final Map<String, Set<String>> entityVersionsReplaced;
 
+	/**
+	 * Map of classes and internal ids of the entities visible on ancestor branches which had been replaced on this branch
+	 * and have been made visible again during this commit because the version on this branch had the same content.
+	 */
+	private final Map<String, Set<String>> entityVersionsRestored;
+
 	private Map<String, Set<String>> versionsReplacedForPromotion;
 
 	/**
@@ -40,6 +46,7 @@ public class Commit implements AutoCloseable {
 		this.branch = branch;
 		this.timepoint = new Date();
 		entityVersionsReplaced = new ConcurrentHashMap<>();
+		entityVersionsRestored = new ConcurrentHashMap<>();
 		entitiesDeleted = Collections.synchronizedSet(new HashSet<>());
 		domainEntityClasses = Collections.synchronizedSet(new HashSet<>());
 		this.commitType = commitType;
@@ -78,6 +85,16 @@ public class Commit implements AutoCloseable {
 
 	public void addVersionsReplaced(Set<String> internalIds, Class<? extends DomainEntity<?>> entityClass) {
 		entityVersionsReplaced.computeIfAbsent(entityClass.getSimpleName(), (c) -> new HashSet<>()).addAll(internalIds);
+		entityVersionsRestored.getOrDefault(entityClass.getSimpleName(), Collections.emptySet()).removeAll(internalIds);
+	}
+
+	public void addVersionsRestored(Set<String> internalIds, Class<? extends DomainEntity<?>> entityClass) {
+		entityVersionsRestored.computeIfAbsent(entityClass.getSimpleName(), (c) -> new HashSet<>()).addAll(internalIds);
+		entityVersionsReplaced.getOrDefault(entityClass.getSimpleName(), Collections.emptySet()).removeAll(internalIds);
+	}
+
+	public Map<String, Set<String>> getEntityVersionsRestored() {
+		return entityVersionsRestored;
 	}
 
 	public void addVersionsDeleted(Set<String> entityIds) {
@@ -89,8 +106,9 @@ public class Commit implements AutoCloseable {
 	}
 
 	public Map<String, Set<String>> getEntityVersionsReplacedIncludingFromBranch() {
-		Map<String, Set<String>> versions = MapUtil.addAll(entityVersionsReplaced, new HashMap<>());
-		return MapUtil.addAll(branch.getVersionsReplaced(), versions);
+		final Map<String, Set<String>> versions = MapUtil.addAll(branch.getVersionsReplaced(), MapUtil.addAll(entityVersionsReplaced, new HashMap<>()));
+		entityVersionsRestored.forEach((type, restored) -> versions.getOrDefault(type, new HashSet<>()).removeAll(restored));
+		return versions;
 	}
 
 	public Map<String, Set<String>> getVersionsReplacedForPromotion() {

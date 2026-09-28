@@ -44,6 +44,7 @@ public class Concept extends DomainEntity<Concept>{
 		return !term.equals(existingComponent.term);
 	}
 
+	@Override
 	public boolean isSameContentAs(Concept otherVersion) {
 		return term.equals(otherVersion.term);
 	}

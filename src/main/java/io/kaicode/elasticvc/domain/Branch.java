@@ -97,6 +97,15 @@ public class Branch extends Entity {
 		}
 	}
 
+	public void removeVersionsReplaced(Map<String, Set<String>> versionsReplacedToRemove) {
+		versionsReplacedToRemove.forEach((key, internalIds) -> {
+			Collection<String> existing = versionsReplaced.get(key);
+			if (existing != null) {
+				existing.removeAll(internalIds);
+			}
+		});
+	}
+
 	public void addVersionsReplaced(DomainEntity<?> entity, Set<String> internalIds) {
 		if (notMAIN()) {
 			versionsReplaced.computeIfAbsent(entity.getClass().getSimpleName(), (clazz) -> new HashSet<>()).addAll(internalIds);

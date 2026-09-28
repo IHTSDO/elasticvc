@@ -85,9 +85,18 @@ public class ComponentService {
 			List<List<C>> batches = Lists.partition(changedOrDeletedComponents, saveBatchSize);
 			for (List<C> batch : batches) {
 				logger.info("Saving batch of {} {}s", batch.size(), componentClass.getSimpleName());
-				final List<String> ids = batch.stream().map(DomainEntity::getId).collect(Collectors.toList());
-				versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
-				final List<C> changedComponents = batch.stream().filter(d -> !d.isDeleted()).collect(Collectors.toList());
+				// Components with the same content as the ancestor version they would hide are not persisted.
+				// Their version on this branch is ended and the ancestor version becomes visible again.
+				final Set<String> restoredIds = versionControlHelper.restoreAncestorVersionsWithSameContent(commit, idField, componentClass,
+						batch.stream().filter(d -> !d.isDeleted()).collect(Collectors.toList()));
+				if (!restoredIds.isEmpty()) {
+					versionControlHelper.endOldVersionsOnThisBranch(componentClass, restoredIds, idField, null, commit, repository);
+				}
+				final List<String> ids = batch.stream().map(DomainEntity::getId).filter(id -> !restoredIds.contains(id)).collect(Collectors.toList());
+				if (!ids.isEmpty()) {
+					versionControlHelper.endOldVersions(commit, idField, componentClass, ids, repository);
+				}
+				final List<C> changedComponents = batch.stream().filter(d -> !d.isDeleted() && !restoredIds.contains(d.getId())).collect(Collectors.toList());
 				if (!changedComponents.isEmpty()) {
 					versionControlHelper.setEntityMeta(changedComponents, commit);
 					repository.saveAll(changedComponents);
