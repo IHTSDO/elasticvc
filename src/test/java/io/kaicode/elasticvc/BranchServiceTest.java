@@ -1,7 +1,7 @@
 package io.kaicode.elasticvc;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.kaicode.elasticvc.api.BranchService;
 import io.kaicode.elasticvc.domain.Branch;
 import io.kaicode.elasticvc.domain.Commit;
@@ -298,7 +298,7 @@ public class BranchServiceTest extends AbstractTest {
 		lockMeta.put("context", lockContext);
 		try {
 			return "{object}|" + objectMapper.writeValueAsString(lockMeta);
-		} catch (JsonProcessingException e) {
+		} catch (JacksonException e) {
 			throw new RuntimeException("Failed to serialise branch lock metadata", e);
 		}
 	}

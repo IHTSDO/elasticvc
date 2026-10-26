@@ -4,7 +4,7 @@ import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
 import io.kaicode.elasticvc.domain.*;
@@ -36,7 +36,6 @@ import static co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders.*;
 import static io.kaicode.elasticvc.api.VersionControlHelper.LARGE_PAGE;
 import static io.kaicode.elasticvc.helper.QueryHelper.*;
 import static java.util.stream.Collectors.toList;
-import static org.springframework.data.elasticsearch.core.query.ScriptType.INLINE;
 
 @Service
 public class BranchService {
@@ -610,7 +609,6 @@ public class BranchService {
 			for (String internalId : endedDocumentIds) {
 				UpdateQuery updateQuery = UpdateQuery.builder(internalId)
 						.withScript("ctx._source.remove('end')")
-						.withScriptType(INLINE)
 						.withLang("painless")
 						.build();
 				updateQueries.add(updateQuery);
